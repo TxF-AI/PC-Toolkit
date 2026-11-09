@@ -261,11 +261,14 @@ function ConvertTo-HtmlSafe { param($Text) [System.Net.WebUtility]::HtmlEncode([
 
 function Export-DiagHtml {
     <# Exporte un ou plusieurs résultats dans un rapport HTML autonome (aucune ressource externe). #>
-    param([object[]]$Results, [string]$Path)
+    param([object[]]$Results, [string]$Path, $Bilan)
     if (-not $Path) {
         $mod = if ($Results.Count -eq 1) { $Results[0].Module } else { 'Complet' }
         $Path = Join-Path (Get-AppPath Reports) ('Rapport_{0}_{1:yyyyMMdd-HHmmss}.html' -f $mod, (Get-Date))
     }
+    # Le bilan « avant / après » (paramètre -Bilan, ou présent dans -Results) est toujours placé à la fin du rapport
+    $bil = if ($Bilan) { $Bilan } else { @($Results | Where-Object { $_.Module -eq 'Bilan' }) | Select-Object -Last 1 }
+    $all = @(@($Results | Where-Object { $_.Module -ne 'Bilan' }) + @($bil | Where-Object { $_ }))
     $label = @{ OK = 'OK'; Warn = 'À surveiller'; Crit = 'Problème'; Info = 'Info'; NA = 'N/D' }
     $sb = New-Object System.Text.StringBuilder
     [void]$sb.Append(@'
@@ -289,13 +292,17 @@ table{width:100%;border-collapse:collapse;font-size:12.5px}th{text-align:left;co
 '@)
     [void]$sb.AppendFormat('<h1>&#x26A1;&#xFE0E; PC//TOOLKIT</h1><div class="sub">Rapport généré le {0:dd/MM/yyyy à HH:mm} sur {1} · PC Toolkit {2}</div>', (Get-Date), (ConvertTo-HtmlSafe $env:COMPUTERNAME), (Get-AppVersion))
 
-    foreach ($r in $Results) {
-        $st = Get-DiagStats $r
-        [void]$sb.AppendFormat('<h2>{0}</h2><div class="meta">Exécuté le {1} · durée {2} s · mode {3}{4}</div>',
-            (ConvertTo-HtmlSafe $r.Title), (ConvertTo-HtmlSafe $r.Date), $r.DurationSec,
-            $(if ($r.IsAdmin) { 'administrateur' } else { 'standard (certaines mesures nécessitent les droits administrateur)' }),
-            $(if ($r.Cancelled) { ' · <b>analyse interrompue</b>' } else { '' }))
-        [void]$sb.AppendFormat('<div class="sum"><span class="b b-Crit">{0} problème(s)</span><span class="b b-Warn">{1} à surveiller</span><span class="b b-OK">{2} OK</span></div>', $st.Crit, $st.Warn, $st.OK)
+    foreach ($r in $all) {
+        if ($r.Module -eq 'Bilan') {
+            [void]$sb.AppendFormat('<h2>&#x1F4CA; {0}</h2><div class="meta">Mesuré le {1}</div>', (ConvertTo-HtmlSafe $r.Title), (ConvertTo-HtmlSafe $r.Date))
+        } else {
+            $st = Get-DiagStats $r
+            [void]$sb.AppendFormat('<h2>{0}</h2><div class="meta">Exécuté le {1} · durée {2} s · mode {3}{4}</div>',
+                (ConvertTo-HtmlSafe $r.Title), (ConvertTo-HtmlSafe $r.Date), $r.DurationSec,
+                $(if ($r.IsAdmin) { 'administrateur' } else { 'standard (certaines mesures nécessitent les droits administrateur)' }),
+                $(if ($r.Cancelled) { ' · <b>analyse interrompue</b>' } else { '' }))
+            [void]$sb.AppendFormat('<div class="sum"><span class="b b-Crit">{0} problème(s)</span><span class="b b-Warn">{1} à surveiller</span><span class="b b-OK">{2} OK</span></div>', $st.Crit, $st.Warn, $st.OK)
+        }
 
         foreach ($s in @($r.Sections)) {
             [void]$sb.AppendFormat('<div class="card"><h3>{0}</h3>', (ConvertTo-HtmlSafe $s.Title))
@@ -351,13 +358,39 @@ function Format-TextTable {
     $lines
 }
 
+function Format-BilanText {
+    <# Tableau « bilan d'optimisation » en texte, colonnes séparées par « | » (bilan = résultat de New-BilanResult). #>
+    param($Result)
+    $lines = New-Object System.Collections.Generic.List[string]
+    $t = @($Result.Sections | ForEach-Object { $_.Tables } | Where-Object { $_ })[0]
+    if (-not $t) { return $lines }
+    $cols = @($t.Columns); $rows = @($t.Rows)
+    $head = @{}; foreach ($c in $cols) { $head[$c] = ([string]$c).ToUpper() -replace '^GAIN NET$', 'GAIN / NET' }
+    $w = @{}
+    foreach ($c in $cols) { $w[$c] = [math]::Max($head[$c].Length, [int](($rows | ForEach-Object { ([string]$_.$c).Length } | Measure-Object -Maximum).Maximum)) }
+    $width = [math]::Max(70, (($cols | ForEach-Object { $w[$_] } | Measure-Object -Sum).Sum + 3 * ($cols.Count - 1)))
+    $lines.Add(''); $lines.Add('')
+    $lines.Add('=' * $width)
+    $lines.Add(('  {0} BILAN D''OPTIMISATION - PC TOOLKIT' -f [char]::ConvertFromUtf32(0x1F4CA)))
+    $lines.Add('=' * $width)
+    $lines.Add(($cols | ForEach-Object { $head[$_].PadRight($w[$_]) }) -join ' | ')
+    $lines.Add('-' * $width)
+    foreach ($row in $rows) { $lines.Add((($cols | ForEach-Object { ([string]$row.$_).PadRight($w[$_]) }) -join ' | ').TrimEnd()) }
+    $lines.Add('=' * $width)
+    foreach ($n in @($Result.Sections | ForEach-Object { $_.Notes } | Where-Object { $_ })) { $lines.Add("  i  $n") }
+    $lines
+}
+
 function Export-DiagText {
     <# Exporte un ou plusieurs résultats en texte brut (UTF-8 avec BOM : accents corrects dans le Bloc-notes). #>
-    param([object[]]$Results, [string]$Path)
+    param([object[]]$Results, [string]$Path, $Bilan)
     if (-not $Path) {
         $mod = if ($Results.Count -eq 1) { $Results[0].Module } else { 'Complet' }
         $Path = Join-Path (Get-AppPath Reports) ('Rapport_{0}_{1:yyyyMMdd-HHmmss}.txt' -f $mod, (Get-Date))
     }
+    # Le bilan « avant / après » (paramètre -Bilan, ou présent dans -Results) est toujours placé à la fin du rapport
+    $bil = if ($Bilan) { $Bilan } else { @($Results | Where-Object { $_.Module -eq 'Bilan' }) | Select-Object -Last 1 }
+    $main = @($Results | Where-Object { $_.Module -ne 'Bilan' })
     $tag = @{ OK = '[  OK  ]'; Warn = '[ATTENT]'; Crit = '[ PROB ]'; Info = '[ INFO ]'; NA = '[ N/D  ]' }
     $out = New-Object System.Collections.Generic.List[string]
     $line = '=' * 78
@@ -365,7 +398,7 @@ function Export-DiagText {
     $out.Add(('  {0} PC//TOOLKIT — rapport du {1:dd/MM/yyyy à HH:mm} — {2} — v{3}' -f [char]0x26A1, (Get-Date), $env:COMPUTERNAME, (Get-AppVersion)))
     $out.Add($line)
     $out.Add('  Légende : [ PROB ] problème · [ATTENT] à surveiller · [  OK  ] · [ INFO ] · [ N/D  ] non disponible')
-    foreach ($r in $Results) {
+    foreach ($r in $main) {
         $st = Get-DiagStats $r
         $out.Add(''); $out.Add('')
         $out.Add('#' * 78)
@@ -388,6 +421,7 @@ function Export-DiagText {
             foreach ($n in @($s.Notes)) { $out.Add(''); $out.Add("  i  $n") }
         }
     }
+    if ($bil) { foreach ($l in (Format-BilanText $bil)) { $out.Add($l) } }
     $out.Add(''); $out.Add($line)
     $out.Add('  Diagnostics en lecture seule. « Non disponible » = valeur non exposée par Windows, jamais estimée.')
     $out.Add($line)

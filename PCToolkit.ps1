@@ -106,7 +106,7 @@ function Start-BackgroundJob {
         Le contexte $ctx (hashtable synchronisée) transporte progression, statut et demande d'annulation.
         $OnComplete reçoit (sortie, erreurs) sur le thread de l'interface.
     #>
-    param([string]$Function, [hashtable]$Params = @{}, [scriptblock]$OnComplete, [string]$StartText = 'Démarrage…')
+    param([string]$Function, [hashtable]$Params = @{}, [scriptblock]$OnComplete, [string]$StartText = 'Démarrage…', [switch]$Baseline)
     if ($script:Job) { return }
     $ctx = [hashtable]::Synchronized(@{ Progress = 0; Status = $StartText; Cancel = $false })
     $rs = [runspacefactory]::CreateRunspace()
@@ -115,13 +115,15 @@ function Start-BackgroundJob {
     $ps = [powershell]::Create()
     $ps.Runspace = $rs
     [void]$ps.AddScript({
-        param($ModDir, $Fn, $Ctx, $P)
+        param($ModDir, $Fn, $Ctx, $P, $Base)
         Get-ChildItem -LiteralPath $ModDir -Filter '*.psm1' | ForEach-Object { Import-Module $_.FullName -Global -Force -DisableNameChecking }
+        # Photo de départ du bilan « avant / après » : silencieuse, avant que le diagnostic ne commence
+        if ($Base) { try { Get-SystemSnapshot -Ctx $null } catch { } }
         $sw = [Diagnostics.Stopwatch]::StartNew()
         $out = & $Fn -Ctx $Ctx @P
         foreach ($o in @($out)) { if ($o -and $o.PSObject.Properties['DurationSec']) { $o.DurationSec = [math]::Round($sw.Elapsed.TotalSeconds, 1) } }
         $out
-    }).AddArgument($ModDir).AddArgument($Function).AddArgument($ctx).AddArgument($Params)
+    }).AddArgument($ModDir).AddArgument($Function).AddArgument($ctx).AddArgument($Params).AddArgument([bool]$Baseline)
     $script:Job = @{ PS = $ps; RS = $rs; Handle = $ps.BeginInvoke(); Ctx = $ctx; OnComplete = $OnComplete; Function = $Function; Label = $StartText.TrimEnd('…', '.', ' ') }
     Set-Busy $true $StartText
     $script:Timer.Start()
@@ -357,8 +359,10 @@ function Invoke-PageDiagnostic {
     $p = $script:Pages[$page]
     if ($p.Custom) { return }
     if ($page -eq 'Storage' -and -not (Test-Path -LiteralPath $UI.TxtScanPath.Text)) { Show-Message 'Le dossier à analyser est introuvable.' 'Stockage' 'Warning'; return }
-    Start-BackgroundJob -Function $p.Fn -Params (Get-PageParams $page) -StartText "Diagnostic $($p.Title.ToLower()) en cours…" -OnComplete {
+    Start-BackgroundJob -Function $p.Fn -Params (Get-PageParams $page) -StartText "Diagnostic $($p.Title.ToLower()) en cours…" -Baseline -OnComplete {
         param($out, $errs)
+        $base = @($out) | Where-Object { $_ -and $_.PSObject.Properties['DiskFreeBytes'] } | Select-Object -First 1
+        if ($base) { Set-BilanBaseline $base }
         $res = @($out) | Where-Object { $_ -and $_.PSObject.Properties['Sections'] } | Select-Object -Last 1
         if (-not $res) {
             Show-Message ("Le diagnostic n'a pas pu aboutir.`n`n" + (($errs | Select-Object -First 3) -join "`n")) 'Erreur' 'Error'
@@ -548,7 +552,7 @@ function Show-MaintenancePage {
 # Photos gardées uniquement en mémoire (aucun fichier). La photo « avant » est prise automatiquement
 # quand un nettoyage vient d'être confirmé ; la photo « après » et le tableau suivent à la fin.
 $script:BilanAvant = $null
-$script:BilanOperation = ''
+$script:BilanOps = New-Object System.Collections.ArrayList   # actions réalisées depuis la mesure de départ
 
 function Get-SnapshotNow {
     $old = $Window.Cursor
@@ -557,9 +561,25 @@ function Get-SnapshotNow {
     finally { $Window.Cursor = $old }
 }
 
-function Start-BilanCapture([string]$Operation = '') {
-    $script:BilanAvant = Get-SnapshotNow
-    $script:BilanOperation = $Operation
+function Set-BilanBaseline($Snapshot) {
+    # Nouvelle mesure de départ (début d'un diagnostic) : le bilan précédent n'a plus de sens
+    $script:BilanAvant = $Snapshot
+    $script:BilanOps.Clear()
+    [void]$script:Results.Remove('Bilan')
+}
+
+function Start-BilanCapture([string]$Operation = '', [switch]$Force) {
+    <#
+        Garantit une mesure de départ. Celle prise au début du diagnostic est conservée (le bilan couvre alors
+        toute la procédure) ; sans diagnostic récent (plus de 2 h), on mesure à l'instant du nettoyage.
+    #>
+    $age = $null
+    if ($script:BilanAvant) { try { $age = (Get-Date) - [datetime]::ParseExact($script:BilanAvant.Date, 'yyyy-MM-dd HH:mm:ss', $null) } catch { } }
+    if ($Force -or -not $script:BilanAvant -or -not $age -or $age.TotalMinutes -gt 120) {
+        $snap = Get-SnapshotNow
+        if ($snap) { Set-BilanBaseline $snap }
+    }
+    if ($Operation -and $script:BilanOps -notcontains $Operation) { [void]$script:BilanOps.Add($Operation) }
 }
 
 function Complete-Bilan {
@@ -567,8 +587,7 @@ function Complete-Bilan {
     $apres = Get-SnapshotNow
     if (-not $apres) { return }
     try {
-        $script:Results['Bilan'] = New-BilanResult -Before $script:BilanAvant -After $apres -Operation $script:BilanOperation
-        $script:BilanAvant = $null
+        $script:Results['Bilan'] = New-BilanResult -Before $script:BilanAvant -After $apres -Operation ($script:BilanOps -join ', ')
         if ($script:CurrentPage -eq 'Bilan') { Show-BilanPage; $UI.BtnExport.IsEnabled = $true }
         else { $UI.NavBilan.IsChecked = $true }
     } catch {
@@ -584,11 +603,11 @@ function Show-BilanPage {
     $sp = New-Object Windows.Controls.StackPanel
     $h = New-Text 'BILAN AUTOMATIQUE' 12 '#FF8A95' 'SemiBold'; $h.FontFamily = 'Bahnschrift SemiBold, Segoe UI Semibold'
     [void]$sp.Children.Add($h)
-    $txt = 'Chaque nettoyage confirmé depuis « Maintenance » (fichiers temporaires, corbeille, fichiers récents, téléchargements inachevés) prend une photo du PC avant de commencer et une autre à la fin, puis affiche ici le tableau comparatif. Rien n''est enregistré : tout reste en mémoire. Pour mesurer autre chose (script de confidentialité, nettoyage audio…), utilisez les deux boutons ci-dessous.'
+    $txt = 'Au début de chaque diagnostic, l''état du PC est mesuré en silence (en mémoire, rien n''est enregistré). Quand vous terminez un nettoyage depuis « Maintenance » (fichiers temporaires, corbeille, fichiers récents, téléchargements inachevés), l''état final est mesuré et le tableau « Avant / Après » s''affiche ici ; il est aussi ajouté à la fin des exports HTML et TXT. Pour mesurer autre chose (script de confidentialité, nettoyage audio…), utilisez les deux boutons ci-dessous.'
     $d = New-Text $txt 12.5 '#C9B8BC' -Wrap; $d.Margin = '0,6,0,10'
     [void]$sp.Children.Add($d)
     if ($script:BilanAvant) {
-        $st = New-Text ("Photo « avant » prise à {0}. Faites votre nettoyage puis cliquez sur « Comparer maintenant »." -f $script:BilanAvant.Date.Substring(11)) 12.5 '#3DDC84' -Wrap
+        $st = New-Text ("Mesure de départ prise à {0}. Après vos nettoyages, le bilan s'affiche tout seul (ou cliquez sur « Comparer maintenant »)." -f $script:BilanAvant.Date.Substring(11)) 12.5 '#3DDC84' -Wrap
         $st.Margin = '0,0,0,10'; [void]$sp.Children.Add($st)
     }
     $wp = New-Object Windows.Controls.WrapPanel
@@ -602,7 +621,7 @@ function Show-BilanPage {
         [Windows.Automation.AutomationProperties]::SetAutomationId($btn, "Bilan_$($b.Id)")
         $btn.Add_Click({
             param($s, $e)
-            if ([string]$s.Tag -eq 'avant') { Start-BilanCapture 'mesure manuelle'; Show-BilanPage }
+            if ([string]$s.Tag -eq 'avant') { Start-BilanCapture 'mesure manuelle' -Force; Show-BilanPage }
             elseif (-not $script:BilanAvant) { Show-Message 'Prenez d''abord la photo « avant ».' 'Bilan' }
             else { Complete-Bilan }
         })
@@ -693,12 +712,12 @@ function Export-Report {
         Exporte en HTML (ouvert dans le navigateur) ou en TXT.
         TXT : ouvert dans le Bloc-notes si la case est cochée, sinon sélectionné dans l'Explorateur.
     #>
-    param([ValidateSet('Html', 'Txt')][string]$Format, [object[]]$Results)
+    param([ValidateSet('Html', 'Txt')][string]$Format, [object[]]$Results, $Bilan)
     if ($Format -eq 'Html') {
-        $file = Export-DiagHtml -Results $Results
+        $file = Export-DiagHtml -Results $Results -Bilan $Bilan
         Start-Process $file
     } else {
-        $file = Export-DiagText -Results $Results
+        $file = Export-DiagText -Results $Results -Bilan $Bilan
         if ($UI.ChkNotepad.IsChecked) { Start-Process notepad.exe -ArgumentList "`"$file`"" }
         else { Start-Process explorer.exe -ArgumentList "/select,`"$file`"" }
     }
@@ -720,7 +739,9 @@ function Export-CurrentPage([string]$Format) {
         if ($script:CurrentPage -eq 'History' -and -not $script:ViewedHistory) { Export-SelectedHistory $Format; return }
         $res = Get-CurrentResult
         if (-not $res) { Show-Message 'Lancez d''abord un diagnostic.'; return }
-        [void](Export-Report $Format @($res))
+        # Le bilan « avant / après » de la session est ajouté à la fin du rapport (sauf pour un ancien diagnostic de l'historique)
+        $bilan = if (-not $script:ViewedHistory) { $script:Results['Bilan'] }
+        [void](Export-Report $Format @($res) $bilan)
     } catch { Show-Message "Export impossible : $($_.Exception.Message)" 'Export' 'Error' }
 }
 

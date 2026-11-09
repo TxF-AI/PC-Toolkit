@@ -98,32 +98,42 @@ Describe 'Maintenance : garde-fous de suppression' {
 
 Describe 'Bilan avant/après (en mémoire)' {
     function New-FakeSnap($o = @{}) {
-        $s = [ordered]@{ Date = '2026-01-01 10:00:00'; IsAdmin = $false; DiskFreeBytes = [long]100GB; RamUsedPct = 68; RamUsedMB = 21760; ServicesRunning = 142; AudioGhost = 37; TempBytes = [long]2GB; RecycleBytes = [long]0; CacheBytes = [long]2GB }
+        $s = [ordered]@{ Date = '2026-01-01 10:00:00'; IsAdmin = $false; DiskFreeBytes = [long]100GB; RamUsedPct = 72; RamUsedMB = 23040; RamFreeMB = 8960; ServicesRunning = 145; Processes = 300; AudioGhost = 37; TempBytes = [long]2GB; RecycleBytes = [long]0; CacheBytes = [long]2GB }
         foreach ($k in $o.Keys) { $s[$k] = $o[$k] }
         [pscustomobject]$s
     }
     $avant = New-FakeSnap
-    $apres = New-FakeSnap @{ DiskFreeBytes = [long](104.6 * 1GB); RamUsedPct = 51; RamUsedMB = 19600; ServicesRunning = 128; AudioGhost = 0; CacheBytes = [long]0 }
+    $apres = New-FakeSnap @{ DiskFreeBytes = [long](104.6 * 1GB); RamUsedPct = 54; RamUsedMB = 20700; RamFreeMB = 11300; ServicesRunning = 128; Processes = 290; AudioGhost = 0; CacheBytes = [long]0 }
     $rows = @(Get-SnapshotComparison -Before $avant -After $apres)
     function Get-Row([string]$Pattern) { $rows | Where-Object { $_.Indicateur -like $Pattern } }
+    $bilan = New-BilanResult -Before $avant -After $apres -Operation 'test'
+    $diag = New-DiagResult -Module 'Test' -Title 'Mon diagnostic' -Ctx $null
+    Add-DiagSection $diag 'Section' -Body { param($s) Add-DiagItem $s 'Mesure' 'valeur' 'OK' }
 
-    It 'Les 5 indicateurs demandés' {
-        $rows.Count | Should Be 5
-        ($rows.Indicateur -join '|') | Should Match 'Disque .* libre\|RAM utilisée\|Services actifs\|Périphériques audio fantômes\|Fichiers temporaires'
+    It 'Les 7 indicateurs demandés' {
+        $rows.Count | Should Be 7
+        ($rows.Indicateur -join '|') | Should Match 'Disque .* libre\|RAM utilisée\|RAM disponible\|Services actifs\|Processus\|Périphériques audio\|Fichiers temporaires'
     }
-    It 'Disque : gain en Go' {
-        (Get-Row 'Disque*').Gain | Should Match '^\+4[,.]6 Go$'
+    It 'Disque : gain en Go libérés' {
+        (Get-Row 'Disque*').Gain | Should Match '^\+4[,.]6 Go libérés$'
         (Get-Row 'Disque*').Status | Should Be 'OK'
     }
-    It 'RAM : pourcentage et Go' {
-        (Get-Row 'RAM*').Avant | Should Match '^68 % \(21[,.]3 Go\)$'
-        (Get-Row 'RAM*').Gain | Should Match '^-17 % \(-2[,.]1 Go\)$'
-        (Get-Row 'RAM*').Status | Should Be 'OK'
+    It 'RAM : pourcentage, Go et Mo disponibles' {
+        (Get-Row 'RAM utilisée').Avant | Should Match '^72 % \(22[,.]5 Go\)$'
+        (Get-Row 'RAM utilisée').Gain | Should Match '^-18 % \(-2[,.]3 Go\)$'
+        (Get-Row 'RAM utilisée').Status | Should Be 'OK'
+        (Get-Row 'RAM disponible').Gain | Should Match '^\+2\D?340 Mo$'
     }
-    It 'Services et fantômes purgés' {
-        (Get-Row 'Services*').Gain | Should Be '-14 services'
-        (Get-Row '*fantômes').Gain | Should Be '-37 fantômes'
-        (Get-Row 'Fichiers*').Gain | Should Match '^-2[,.]0 Go$'
+    It 'Services coupés, périphériques purgés, temporaires nettoyés' {
+        (Get-Row 'Services*').Gain | Should Be '-17 services coupés'
+        (Get-Row 'Périphériques*').Avant | Should Be '37 fantômes'
+        (Get-Row 'Périphériques*').Apres | Should Be '0'
+        (Get-Row 'Périphériques*').Gain | Should Be '-37 purgés'
+        (Get-Row 'Fichiers*').Gain | Should Match '^-2[,.]0 Go nettoyés$'
+    }
+    It 'Processus : variation neutre (jamais présentée comme un gain)' {
+        (Get-Row 'Processus').Gain | Should Be '-10 processus'
+        (Get-Row 'Processus').Status | Should Be 'Info'
     }
     It 'Valeur identique = Aucun changement (neutre)' {
         $r = @(Get-SnapshotComparison -Before $avant -After $avant) | Where-Object { $_.Indicateur -like 'Services*' }
@@ -131,22 +141,44 @@ Describe 'Bilan avant/après (en mémoire)' {
         $r.Status | Should Be 'Info'
     }
     It 'Dégradation signalée (Warn)' {
-        $r = @(Get-SnapshotComparison -Before $avant -After (New-FakeSnap @{ ServicesRunning = 143 })) | Where-Object { $_.Indicateur -like 'Services*' }
+        $r = @(Get-SnapshotComparison -Before $avant -After (New-FakeSnap @{ ServicesRunning = 146 })) | Where-Object { $_.Indicateur -like 'Services*' }
         $r.Status | Should Be 'Warn'
         $r.Gain | Should Be '+1 service'
     }
     It 'Mesure manquante : Non disponible, jamais inventée' {
-        $r = @(Get-SnapshotComparison -Before $avant -After (New-FakeSnap @{ DiskFreeBytes = $null; AudioGhost = $null })) | Where-Object { $_.Indicateur -like 'Disque*' -or $_.Indicateur -like '*fantômes' }
+        $r = @(Get-SnapshotComparison -Before $avant -After (New-FakeSnap @{ DiskFreeBytes = $null; AudioGhost = $null })) | Where-Object { $_.Indicateur -like 'Disque*' -or $_.Indicateur -like 'Périphériques*' }
         @($r | Where-Object { $_.Status -eq 'NA' -and $_.Gain -eq 'Non disponible' -and $_.Apres -eq 'Non disponible' }).Count | Should Be 2
     }
-    It 'Résultat standard : tableau Indicateur / Avant / Après / Gain net, exportable' {
-        $res = New-BilanResult -Before $avant -After $apres -Operation 'test'
-        $res.Module | Should Be 'Bilan'
-        $res.Sections.Count | Should Be 2
-        ($res.Sections[1].Tables[0].Columns -join '|') | Should Be 'Indicateur|Avant|Après|Gain net'
-        $res.Sections[1].Tables[0].Rows.Count | Should Be 5
-        $txt = (Format-TextTable $res.Sections[1].Tables[0]) -join "`n"
-        $txt | Should Match 'Gain net'
+    It 'Résultat standard : tableau Indicateur / Avant / Après / Gain net' {
+        $bilan.Module | Should Be 'Bilan'
+        $bilan.Sections.Count | Should Be 2
+        ($bilan.Sections[1].Tables[0].Columns -join '|') | Should Be 'Indicateur|Avant|Après|Gain net'
+        $bilan.Sections[1].Tables[0].Rows.Count | Should Be 7
+    }
+    It 'Export TXT : le bilan est ajouté automatiquement à la fin du rapport' {
+        $f = Join-Path $TestDrive 'rapport.txt'
+        [void](Export-DiagText -Results @($diag) -Bilan $bilan -Path $f)
+        $t = Get-Content -LiteralPath $f -Raw -Encoding UTF8
+        $t | Should Match "BILAN D'OPTIMISATION - PC TOOLKIT"
+        $t | Should Match 'INDICATEUR +\| AVANT +\| APRÈS +\| GAIN / NET'
+        $t | Should Match 'Services actifs +\| 145 +\| 128 +\| -17 services coupés'
+        $t.IndexOf("BILAN D'OPTIMISATION") | Should BeGreaterThan $t.IndexOf('MON DIAGNOSTIC')
+    }
+    It 'Export TXT et HTML : même si le bilan est passé en premier dans -Results, il reste en dernier' {
+        $f = Join-Path $TestDrive 'ordre.txt'
+        [void](Export-DiagText -Results @($bilan, $diag) -Path $f)
+        $t = Get-Content -LiteralPath $f -Raw -Encoding UTF8
+        $t.IndexOf("BILAN D'OPTIMISATION") | Should BeGreaterThan $t.IndexOf('MON DIAGNOSTIC')
+        $h = Join-Path $TestDrive 'ordre.html'
+        [void](Export-DiagHtml -Results @($bilan, $diag) -Path $h)
+        $x = Get-Content -LiteralPath $h -Raw -Encoding UTF8
+        $x.IndexOf('Gain net') | Should BeGreaterThan $x.IndexOf('Mon diagnostic')
+        $x | Should Match 'Services actifs'
+    }
+    It 'Export sans bilan : rapport inchangé (aucune section bilan)' {
+        $f = Join-Path $TestDrive 'sans.txt'
+        [void](Export-DiagText -Results @($diag) -Path $f)
+        (Get-Content -LiteralPath $f -Raw -Encoding UTF8) | Should Not Match "BILAN D'OPTIMISATION"
     }
     It 'La photo réelle est lisible et n''écrit aucun fichier' {
         $dir = Join-Path $Root 'Data\Snapshots'
@@ -155,7 +187,16 @@ Describe 'Bilan avant/après (en mémoire)' {
         $s.DiskFreeBytes | Should BeGreaterThan 0
         $s.RamUsedPct | Should BeLessThan 101
         $s.ServicesRunning | Should BeGreaterThan 0
+        $s.Processes | Should BeGreaterThan 0
         Test-Path $dir | Should Be $false
+    }
+    It 'Le flux est branché dans l''interface (baseline au diagnostic, bilan à la fin, export)' {
+        $code = Get-Content -LiteralPath (Join-Path $Root 'PCToolkit.ps1') -Raw -Encoding UTF8
+        $code | Should Match '-Baseline -OnComplete'
+        $code | Should Match 'Set-BilanBaseline \$base'
+        ([regex]::Matches($code, 'Complete-Bilan')).Count | Should BeGreaterThan 4
+        ([regex]::Matches($code, 'Start-BilanCapture')).Count | Should BeGreaterThan 4
+        $code | Should Match 'Export-Report \$Format @\(\$res\) \$bilan'
     }
 }
 
