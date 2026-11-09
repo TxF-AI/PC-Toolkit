@@ -6,6 +6,20 @@ Merci de l'intérêt porté au projet ! Quelques règles simples pour que chaque
 - Ouvrez d'abord une **issue** (bug ou idée) pour en discuter, surtout pour une nouvelle fonctionnalité.
 - Environnement : **Windows 10/11**, **Windows PowerShell 5.1** (pas PowerShell 7), Pester 3.4 (fourni avec Windows).
 
+## Structure du projet
+```
+PCToolkit.ps1        interface WPF : pages, jobs en arrière-plan (runspace), jauges, console
+UI\MainWindow.xaml   design de l'interface
+Modules\Core.psm1    modèle de résultat (New-DiagResult / Add-DiagSection / Add-DiagItem), journal, exports HTML/TXT
+Modules\*.psm1       un module par page : Dashboard, Hardware, Network, WindowsAnalysis, Storage, Audio,
+                     Maintenance, Performance (démarrage, Mode Performance), Tuning (presets),
+                     SecurityGuard (audit, scan, quarantaine), Bilan (avant/après)
+Tests\               suite Pester (PCToolkit.Tests.ps1)
+Run-Tests.ps1        lance la suite ; Build-Zip.ps1 fabrique le zip de distribution
+Installer.ps1 / Desinstaller.ps1   installation et désinstallation utilisateur
+VERSION              seule source du numéro de version
+```
+
 ## Règles du produit (non négociables)
 - **Diagnostics en lecture seule.** Toute action qui modifie le système doit : afficher un aperçu, exiger une confirmation explicite (`-Confirmed`), puis écrire dans le journal (`Write-AppLog ... 'ACTION'`).
 - **Ne jamais inventer une mesure** : ce que Windows n'expose pas s'affiche « Non disponible ».

@@ -1,5 +1,6 @@
 # ⚡ PC//TOOLKIT — maintenance et diagnostic
 
+[![CI](https://github.com/TxF-AI/PC-Toolkit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/TxF-AI/PC-Toolkit/actions/workflows/ci.yml)
 ![Version](https://img.shields.io/badge/version-v1.5.0-FF2A4D)
 ![Tests Pester](https://img.shields.io/badge/tests%20Pester-147%2F147%20passing-brightgreen)
 ![Licence](https://img.shields.io/badge/licence-MIT-22E5FF)
