@@ -1,0 +1,89 @@
+name: Signaler un bug
+description: Quelque chose ne fonctionne pas comme prévu dans PC Toolkit.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de signaler le problème. **Les exports HTML/TXT et la console contiennent le nom de ton PC, ton matériel et parfois des chemins personnels : relis-les et masque ces informations avant de les joindre.**
+  - type: input
+    id: app-version
+    attributes:
+      label: Version de PC Toolkit
+      description: Affichée en bas de la barre latérale et dans chaque rapport (fichier `VERSION`).
+      placeholder: "1.5.0"
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: Version de Windows
+      description: "Commande `winver`."
+      placeholder: "Windows 11 23H2 (build 22631)"
+    validations:
+      required: true
+  - type: input
+    id: ps-version
+    attributes:
+      label: Version de PowerShell
+      description: "Commande `$PSVersionTable.PSVersion` (Windows PowerShell 5.1 attendu)."
+      placeholder: "5.1.22621.4391"
+  - type: dropdown
+    id: privileges
+    attributes:
+      label: Mode d'exécution
+      options:
+        - Mode standard
+        - Administrateur
+        - Je ne sais pas
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Page concernée
+      options:
+        - Tableau de bord
+        - Matériel
+        - Réseau
+        - Windows
+        - Stockage
+        - Audio
+        - Maintenance
+        - Démarrage
+        - Mode Performance (presets Jeu / MAO / Bureautique)
+        - Security Guard
+        - Bilan avant/après
+        - Historique
+        - Installation / lancement
+        - Autre
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportement attendu
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Comportement observé
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Étapes pour reproduire
+      placeholder: |
+        1. Ouvrir « Mode Performance »
+        2. Cliquer sur « Preset Jeu… »
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console, message d'erreur, captures d'écran
+      description: Colle les lignes de la console intégrée ou glisse une capture (sans nom de PC ni données personnelles).

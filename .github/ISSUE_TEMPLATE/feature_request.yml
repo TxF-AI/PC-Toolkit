@@ -1,0 +1,46 @@
+name: Proposer une fonctionnalité
+description: Une idée pour améliorer PC Toolkit.
+title: "[Idée] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: Besoin
+      description: Quel problème veux-tu résoudre ? Qui est concerné (joueur, musicien, bureautique…) ?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposition
+      description: Décris ce que l'outil devrait faire (page, bouton, comportement).
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées
+      description: Contournements actuels, autres outils.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Concerne
+      options:
+        - Diagnostics (lecture seule)
+        - Maintenance / nettoyage
+        - Mode Performance / presets
+        - Security Guard
+        - Bilan avant/après
+        - Interface
+        - Installation
+        - Autre
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Respect des règles du produit
+      options:
+        - label: Les diagnostics restent en lecture seule.
+        - label: Toute action qui modifie le système a un aperçu et une confirmation.
+        - label: Aucune dépendance externe ni envoi de données sur Internet.
+        - label: Les mesures que Windows n'expose pas s'affichent « Non disponible ».

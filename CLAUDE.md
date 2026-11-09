@@ -30,6 +30,7 @@ Outil de diagnostic et de maintenance Windows : **Windows PowerShell 5.1 + WPF**
 ## Commandes
 - Tests : `powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-Tests.ps1` — à lancer après chaque modification.
 - Zip à partager : `powershell -NoProfile -ExecutionPolicy Bypass -File .\Build-Zip.ps1` (sur le Bureau, avec empreinte SHA-256).
+- Lancement : `launch-all.ps1` (menu interactif : copie les textes des `LAUNCH_KIT*.md` dans le presse-papier, ouvre les pages de publication, montre les médias ; ne publie rien ; `-DryRun` pour tester). Médias dans `dist-launch/` (anonymisés : nom du PC et matériel masqués ; jamais de capture brute de la fenêtre).
 - Lancer l'appli : `Lancer PC Toolkit.cmd`.
 
 ## Ne pas toucher
