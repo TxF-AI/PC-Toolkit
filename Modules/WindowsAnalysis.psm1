@@ -37,9 +37,9 @@ function Get-StartupEntries {
     <# Programmes lancés au démarrage (clés Run + dossiers Démarrage) avec leur état dans le Gestionnaire des tâches. #>
     $out = @()
     $sources = @(
-        @{ Path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'; Approved = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run'; Scope = 'Utilisateur' },
-        @{ Path = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run'; Approved = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run'; Scope = 'Tous' },
-        @{ Path = 'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Run'; Approved = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run32'; Scope = 'Tous (32 bits)' }
+        @{ Path = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'; Approved = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run'; Scope = (Get-Text 'Win.001') },
+        @{ Path = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Run'; Approved = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run'; Scope = (Get-Text 'Win.002') },
+        @{ Path = 'HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Run'; Approved = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run32'; Scope = (Get-Text 'Win.003') }
     )
     foreach ($src in $sources) {
         $props = Get-ItemProperty $src.Path -ErrorAction SilentlyContinue
@@ -48,19 +48,19 @@ function Get-StartupEntries {
         foreach ($p in $props.PSObject.Properties | Where-Object { $_.Name -notlike 'PS*' }) {
             $bytes = $appr.($p.Name)
             $enabled = -not ($bytes -and ($bytes[0] -band 1))
-            $out += [pscustomobject]@{ Nom = $p.Name; État = $(if ($enabled) { 'Activé' } else { 'Désactivé' }); Portée = $src.Scope; Commande = "$($p.Value)" }
+            $out += [pscustomobject]@{ Nom = $p.Name; État = $(if ($enabled) { (Get-Text 'Win.004') } else { (Get-Text 'Win.005') }); Portée = $src.Scope; Commande = "$($p.Value)" }
         }
     }
     $folders = @(
-        @{ Path = [Environment]::GetFolderPath('Startup'); Approved = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder'; Scope = 'Utilisateur (dossier)' },
-        @{ Path = [Environment]::GetFolderPath('CommonStartup'); Approved = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder'; Scope = 'Tous (dossier)' }
+        @{ Path = [Environment]::GetFolderPath('Startup'); Approved = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder'; Scope = (Get-Text 'Win.007') },
+        @{ Path = [Environment]::GetFolderPath('CommonStartup'); Approved = 'HKLM:\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\StartupFolder'; Scope = (Get-Text 'Win.009') }
     )
     foreach ($f in $folders) {
         $appr = Get-ItemProperty $f.Approved -ErrorAction SilentlyContinue
         foreach ($file in Get-ChildItem -LiteralPath $f.Path -File -ErrorAction SilentlyContinue | Where-Object Name -ne 'desktop.ini') {
             $bytes = $appr.($file.Name)
             $enabled = -not ($bytes -and ($bytes[0] -band 1))
-            $out += [pscustomobject]@{ Nom = $file.BaseName; État = $(if ($enabled) { 'Activé' } else { 'Désactivé' }); Portée = $f.Scope; Commande = $file.FullName }
+            $out += [pscustomobject]@{ Nom = $file.BaseName; État = $(if ($enabled) { (Get-Text 'Win.010') } else { (Get-Text 'Win.011') }); Portée = $f.Scope; Commande = $file.FullName }
         }
     }
     $out
@@ -68,41 +68,41 @@ function Get-StartupEntries {
 
 function Invoke-WindowsDiagnostic {
     param($Ctx, [int]$Days = 7)
-    $r = New-DiagResult -Module 'Windows' -Title 'Analyse Windows' -Ctx $Ctx
+    $r = New-DiagResult -Module 'Windows' -Title (Get-Text 'Win.013') -Ctx $Ctx
     $since = (Get-Date).AddDays(-$Days)
 
     # --- Système ---------------------------------------------------------------
-    Update-DiagProgress $Ctx 5 'Lecture de la version de Windows…'
-    Add-DiagSection $r 'Système' -Body {
+    Update-DiagProgress $Ctx 5 (Get-Text 'Win.014')
+    Add-DiagSection $r (Get-Text 'Win.015') -Body {
         param($s)
         $os = Get-SafeCim Win32_OperatingSystem
         $cv = Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
         $ver = $cv.DisplayVersion
-        Add-DiagItem $s 'Édition' ('{0} {1} (build {2}.{3})' -f ($os.Caption -replace 'Microsoft ', ''), $ver, $cv.CurrentBuild, $cv.UBR)
+        Add-DiagItem $s (Get-Text 'Win.016') ((Get-Text 'Win.017') -f ($os.Caption -replace (Get-Text 'Win.018'), ''), $ver, $cv.CurrentBuild, $cv.UBR)
         if ($script:Win11EndOfService.ContainsKey($ver)) {
             $eos = $script:Win11EndOfService[$ver]
             $left = ($eos - (Get-Date)).TotalDays
             $st = if ($left -lt 0) { 'Crit' } elseif ($left -lt 120) { 'Warn' } else { 'OK' }
-            $txt = if ($left -lt 0) { "Plus prise en charge depuis le $($eos.ToString('dd/MM/yyyy'))" } else { "Prise en charge jusqu'au $($eos.ToString('dd/MM/yyyy'))" }
-            Add-DiagItem $s 'Support de la version' $txt $st $(if ($left -lt 120) { 'Une version non prise en charge ne reçoit plus de correctifs de sécurité. Mise à jour via Paramètres > Windows Update.' } else { '' })
+            $txt = if ($left -lt 0) { (Get-Text 'Win.019' $($eos.ToString('dd/MM/yyyy'))) } else { (Get-Text 'Win.020' $($eos.ToString('dd/MM/yyyy'))) }
+            Add-DiagItem $s (Get-Text 'Win.021') $txt $st $(if ($left -lt 120) { (Get-Text 'Win.022') } else { '' })
         }
         $up = (Get-Date) - $os.LastBootUpTime
-        Add-DiagItem $s 'Dernier démarrage' ('{0:dd/MM/yyyy HH:mm} (il y a {1})' -f $os.LastBootUpTime, (Format-Span $up)) $(if ($up.TotalDays -gt 7) { 'Warn' } else { 'OK' }) $(if ($up.TotalDays -gt 7) { 'Pas de redémarrage complet depuis plus de 7 jours (le « démarrage rapide » ne compte pas comme un redémarrage).' } else { '' })
+        Add-DiagItem $s (Get-Text 'Win.023') ((Get-Text 'Win.024') -f $os.LastBootUpTime, (Format-Span $up)) $(if ($up.TotalDays -gt 7) { 'Warn' } else { 'OK' }) $(if ($up.TotalDays -gt 7) { (Get-Text 'Win.025') } else { '' })
         $pend = Test-PendingReboot
-        Add-DiagItem $s 'Redémarrage en attente' $(if ($pend) { 'Oui' } else { 'Non' }) $(if ($pend) { 'Warn' } else { 'OK' })
+        Add-DiagItem $s (Get-Text 'Win.026') $(if ($pend) { 'Oui' } else { 'Non' }) $(if ($pend) { 'Warn' } else { 'OK' })
         $hf = Get-HotFix -ErrorAction SilentlyContinue | Where-Object InstalledOn | Sort-Object InstalledOn -Descending | Select-Object -First 1
         if ($hf) {
             $age = ((Get-Date) - $hf.InstalledOn).TotalDays
-            Add-DiagItem $s 'Dernière mise à jour installée' ('{0} le {1:dd/MM/yyyy}' -f $hf.HotFixID, $hf.InstalledOn) $(if ($age -gt 45) { 'Warn' } else { 'OK' })
+            Add-DiagItem $s (Get-Text 'Win.027') ((Get-Text 'Win.028') -f $hf.HotFixID, $hf.InstalledOn) $(if ($age -gt 45) { 'Warn' } else { 'OK' })
         }
         $fs = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power' -ErrorAction SilentlyContinue).HiberbootEnabled
-        Add-DiagItem $s 'Démarrage rapide' $(if ($fs -eq 1) { 'Activé' } else { 'Désactivé' }) 'Info' 'Quand il est activé, « Arrêter » ne réinitialise pas complètement les pilotes : préférez « Redémarrer » après un souci matériel.'
+        Add-DiagItem $s (Get-Text 'Win.029') $(if ($fs -eq 1) { (Get-Text 'Win.030') } else { (Get-Text 'Win.031') }) 'Info' (Get-Text 'Win.032')
     }
 
     # --- Stabilité ---------------------------------------------------------------
-    Update-DiagProgress $Ctx 20 'Analyse des journaux système…'
-    $period = if ($Days -eq 1) { 'dernières 24 h' } else { "$Days derniers jours" }
-    Add-DiagSection $r "Stabilité ($period)" -Body {
+    Update-DiagProgress $Ctx 20 (Get-Text 'Win.033')
+    $period = if ($Days -eq 1) { (Get-Text 'Win.034') } else { (Get-Text 'Win.035' $Days) }
+    Add-DiagSection $r (Get-Text 'Win.036' $period) -Body {
         param($s)
         $kp = Get-EventsSafe @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-Power'; Id = 41; StartTime = $since }
         $bc = Get-EventsSafe @{ LogName = 'System'; Id = 1001; ProviderName = 'Microsoft-Windows-WER-SystemErrorReporting'; StartTime = $since }
@@ -110,90 +110,90 @@ function Invoke-WindowsDiagnostic {
         $disk = Get-EventsSafe @{ LogName = 'System'; ProviderName = 'disk', 'Ntfs', 'stornvme', 'storahci'; Level = 1, 2, 3; StartTime = $since }
         $usb = Get-EventsSafe @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Kernel-PnP'; Id = 219; StartTime = $since }
 
-        Add-DiagItem $s 'Arrêts inattendus (Kernel-Power 41)' $kp.Count $(if ($kp.Count -ge 2) { 'Crit' } elseif ($kp.Count -eq 1) { 'Warn' } else { 'OK' }) 'Coupure, appui long sur le bouton d''alimentation ou blocage complet du PC.'
-        Add-DiagItem $s 'Écrans bleus (BugCheck)' $bc.Count $(if ($bc.Count) { 'Crit' } else { 'OK' })
-        Add-DiagItem $s 'Erreurs matérielles (WHEA)' $whea.Count $(if ($whea.Count) { 'Crit' } else { 'OK' }) 'Erreurs signalées par le CPU, la mémoire ou le bus PCIe : souvent liées à l''overclocking, au XMP ou au BIOS.'
-        Add-DiagItem $s 'Alertes disque / NTFS' $disk.Count $(if ($disk.Count -ge 5) { 'Crit' } elseif ($disk.Count) { 'Warn' } else { 'OK' })
-        Add-DiagItem $s 'Pilotes non chargés (PnP 219)' $usb.Count $(if ($usb.Count -ge 5) { 'Warn' } else { 'Info' })
+        Add-DiagItem $s (Get-Text 'Win.046') $kp.Count $(if ($kp.Count -ge 2) { 'Crit' } elseif ($kp.Count -eq 1) { 'Warn' } else { 'OK' }) (Get-Text 'Win.047')
+        Add-DiagItem $s (Get-Text 'Win.048') $bc.Count $(if ($bc.Count) { 'Crit' } else { 'OK' })
+        Add-DiagItem $s (Get-Text 'Win.049') $whea.Count $(if ($whea.Count) { 'Crit' } else { 'OK' }) (Get-Text 'Win.050')
+        Add-DiagItem $s (Get-Text 'Win.051') $disk.Count $(if ($disk.Count -ge 5) { 'Crit' } elseif ($disk.Count) { 'Warn' } else { 'OK' })
+        Add-DiagItem $s (Get-Text 'Win.052') $usb.Count $(if ($usb.Count -ge 5) { 'Warn' } else { 'Info' })
 
         $crit = (@($kp) + @($bc) + @($whea)) | Sort-Object TimeCreated -Descending | Select-Object -First 15 |
             ForEach-Object { [pscustomobject]@{ Date = $_.TimeCreated.ToString('dd/MM HH:mm'); Source = ($_.ProviderName -replace 'Microsoft-Windows-', ''); ID = $_.Id; Message = (("$($_.Message)" -split "`n")[0]).Trim() } }
-        if ($crit) { Add-DiagTable $s 'Derniers événements critiques' $crit }
+        if ($crit) { Add-DiagTable $s (Get-Text 'Win.054') $crit }
 
         $rel = Get-SafeCim Win32_ReliabilityStabilityMetrics | Sort-Object TimeGenerated -Descending | Select-Object -First 1
-        if ($rel) { Add-DiagItem $s 'Indice de fiabilité Windows' ('{0:N1} / 10' -f $rel.SystemStabilityIndex) $(if ($rel.SystemStabilityIndex -lt 5) { 'Warn' } else { 'OK' }) }
+        if ($rel) { Add-DiagItem $s (Get-Text 'Win.055') ('{0:N1} / 10' -f $rel.SystemStabilityIndex) $(if ($rel.SystemStabilityIndex -lt 5) { 'Warn' } else { 'OK' }) }
     }
 
     # --- Journaux ---------------------------------------------------------------
-    Update-DiagProgress $Ctx 40 'Regroupement des erreurs…'
-    Add-DiagSection $r 'Erreurs des journaux' -Body {
+    Update-DiagProgress $Ctx 40 (Get-Text 'Win.056')
+    Add-DiagSection $r (Get-Text 'Win.057') -Body {
         param($s)
         $sys = Get-EventsSafe @{ LogName = 'System'; Level = 1, 2; StartTime = $since }
         $app = Get-EventsSafe @{ LogName = 'Application'; Level = 1, 2; StartTime = $since }
-        Add-DiagItem $s 'Erreurs Système' $sys.Count $(if ($sys.Count -gt 100) { 'Warn' } else { 'Info' })
-        Add-DiagItem $s 'Erreurs Application' $app.Count $(if ($app.Count -gt 100) { 'Warn' } else { 'Info' })
+        Add-DiagItem $s (Get-Text 'Win.060') $sys.Count $(if ($sys.Count -gt 100) { 'Warn' } else { 'Info' })
+        Add-DiagItem $s (Get-Text 'Win.061') $app.Count $(if ($app.Count -gt 100) { 'Warn' } else { 'Info' })
         $grp = $sys | Group-Object ProviderName | Sort-Object Count -Descending | Select-Object -First 10 |
             ForEach-Object { $l = $_.Group | Sort-Object TimeCreated -Descending | Select-Object -First 1; [pscustomobject]@{ Source = $_.Name; Nombre = $_.Count; Dernière = $l.TimeCreated.ToString('dd/MM HH:mm'); 'Dernier message' = (("$($l.Message)" -split "`n")[0]).Trim() } }
-        Add-DiagTable $s 'Sources d''erreurs système les plus fréquentes' $grp
+        Add-DiagTable $s (Get-Text 'Win.063') $grp
         # Plantages d'applications (Application Error 1000 / Application Hang 1002)
         $crash = $app | Where-Object { $_.Id -in 1000, 1002 -and $_.ProviderName -in 'Application Error', 'Application Hang' }
         $cg = $crash | Group-Object { "$($_.Properties[0].Value)" } | Sort-Object Count -Descending | Select-Object -First 10 |
             ForEach-Object { [pscustomobject]@{ Application = $_.Name; Plantages = @($_.Group | Where-Object Id -eq 1000).Count; Blocages = @($_.Group | Where-Object Id -eq 1002).Count; Dernier = ($_.Group | Sort-Object TimeCreated -Descending | Select-Object -First 1).TimeCreated.ToString('dd/MM HH:mm') } }
-        Add-DiagItem $s 'Applications plantées / bloquées' @($crash).Count $(if (@($crash).Count -ge 5) { 'Warn' } else { 'Info' })
-        if ($cg) { Add-DiagTable $s 'Applications concernées' $cg }
-        Add-DiagNote $s 'Beaucoup d''erreurs Windows sont bénignes et récurrentes : c''est leur répétition ou leur coïncidence avec un problème ressenti qui compte.'
+        Add-DiagItem $s (Get-Text 'Win.067') @($crash).Count $(if (@($crash).Count -ge 5) { 'Warn' } else { 'Info' })
+        if ($cg) { Add-DiagTable $s (Get-Text 'Win.068') $cg }
+        Add-DiagNote $s (Get-Text 'Win.069')
     }
 
     # --- Services ---------------------------------------------------------------
-    Update-DiagProgress $Ctx 65 'Analyse des services…'
-    Add-DiagSection $r 'Services' -Body {
+    Update-DiagProgress $Ctx 65 (Get-Text 'Win.070')
+    Add-DiagSection $r (Get-Text 'Win.071') -Body {
         param($s)
         $svc = @(Get-SafeCim Win32_Service)
         $stopped = $svc | Where-Object { $_.StartMode -eq 'Auto' -and $_.State -ne 'Running' -and $_.ExitCode -ne 0 }
-        Add-DiagItem $s 'Services en échec au démarrage' @($stopped).Count $(if (@($stopped).Count) { 'Warn' } else { 'OK' }) 'Services automatiques arrêtés avec un code d''erreur (les arrêts normaux sont ignorés).'
-        if ($stopped) { Add-DiagTable $s 'Services automatiques en échec' ($stopped | ForEach-Object { [pscustomobject]@{ Nom = $_.Name; 'Nom affiché' = $_.DisplayName; 'Code de sortie' = $_.ExitCode } }) }
+        Add-DiagItem $s (Get-Text 'Win.074') @($stopped).Count $(if (@($stopped).Count) { 'Warn' } else { 'OK' }) (Get-Text 'Win.075')
+        if ($stopped) { Add-DiagTable $s (Get-Text 'Win.076') ($stopped | ForEach-Object { [pscustomobject]@{ Nom = $_.Name; 'Nom affiché' = $_.DisplayName; 'Code de sortie' = $_.ExitCode } }) }
         $third = $svc | Where-Object { $_.State -eq 'Running' -and $_.PathName -and $_.PathName -notmatch '(?i)\\Windows\\(system32|SysWOW64|Microsoft\.NET|servicing)|\\Windows Defender\\|\\Microsoft\\' } | Sort-Object DisplayName
-        Add-DiagItem $s 'Services tiers en cours d''exécution' @($third).Count 'Info'
-        Add-DiagTable $s 'Services tiers actifs (non Microsoft)' ($third | ForEach-Object { [pscustomobject]@{ 'Nom affiché' = $_.DisplayName; Démarrage = $_.StartMode; Chemin = ($_.PathName -replace '"', '') } })
-        Add-DiagNote $s 'Lecture seule : aucun service n''est modifié. Ne désactivez un service que si vous savez à quoi il sert.'
+        Add-DiagItem $s (Get-Text 'Win.078') @($third).Count 'Info'
+        Add-DiagTable $s (Get-Text 'Win.079') ($third | ForEach-Object { [pscustomobject]@{ 'Nom affiché' = $_.DisplayName; Démarrage = $_.StartMode; Chemin = ($_.PathName -replace '"', '') } })
+        Add-DiagNote $s (Get-Text 'Win.080')
     }
 
     # --- Démarrage ---------------------------------------------------------------
-    Update-DiagProgress $Ctx 80 'Programmes au démarrage…'
-    Add-DiagSection $r 'Démarrage' -Body {
+    Update-DiagProgress $Ctx 80 (Get-Text 'Win.081')
+    Add-DiagSection $r (Get-Text 'Win.082') -Body {
         param($s)
         $st = @(Get-StartupEntries)
-        $en = @($st | Where-Object État -eq 'Activé')
-        Add-DiagItem $s 'Programmes au démarrage' ('{0} activé(s), {1} désactivé(s)' -f $en.Count, ($st.Count - $en.Count)) $(if ($en.Count -gt 12) { 'Warn' } else { 'OK' })
-        Add-DiagTable $s 'Entrées de démarrage' ($st | Sort-Object État, Nom)
+        $en = @($st | Where-Object État -eq (Get-Text 'Win.083'))
+        Add-DiagItem $s (Get-Text 'Win.084') ((Get-Text 'Win.085') -f $en.Count, ($st.Count - $en.Count)) $(if ($en.Count -gt 12) { 'Warn' } else { 'OK' })
+        Add-DiagTable $s (Get-Text 'Win.086') ($st | Sort-Object État, Nom)
         try {
             $tasks = @(Get-ScheduledTask -ErrorAction Stop | Where-Object { $_.State -ne 'Disabled' -and $_.TaskPath -notlike '\Microsoft\*' -and ($_.Triggers | Where-Object { $_.CimClass.CimClassName -in 'MSFT_TaskLogonTrigger', 'MSFT_TaskBootTrigger' }) })
-            Add-DiagItem $s 'Tâches planifiées à l''ouverture de session' $tasks.Count 'Info'
-            if ($tasks) { Add-DiagTable $s 'Tâches planifiées tierces (ouverture de session / démarrage)' ($tasks | ForEach-Object { [pscustomobject]@{ Tâche = $_.TaskName; Dossier = $_.TaskPath; État = "$($_.State)" } }) }
+            Add-DiagItem $s (Get-Text 'Win.088') $tasks.Count 'Info'
+            if ($tasks) { Add-DiagTable $s (Get-Text 'Win.089') ($tasks | ForEach-Object { [pscustomobject]@{ Tâche = $_.TaskName; Dossier = $_.TaskPath; État = "$($_.State)" } }) }
         } catch { }
         $bp = Get-EventsSafe @{ LogName = 'Microsoft-Windows-Diagnostics-Performance/Operational'; Id = 100 } 1
-        if ($bp) { Add-DiagItem $s 'Durée du dernier démarrage' ('{0:N1} s' -f ([double]$bp[0].Properties[5].Value / 1000)) 'Info' }
+        if ($bp) { Add-DiagItem $s (Get-Text 'Win.090') ('{0:N1} s' -f ([double]$bp[0].Properties[5].Value / 1000)) 'Info' }
     }
 
     # --- Sécurité ---------------------------------------------------------------
-    Update-DiagProgress $Ctx 92 'État de la sécurité…'
-    Add-DiagSection $r 'Sécurité' -Body {
+    Update-DiagProgress $Ctx 92 (Get-Text 'Win.091')
+    Add-DiagSection $r (Get-Text 'Win.092') -Body {
         param($s)
         $av = @(Get-SafeCim -Namespace 'root/SecurityCenter2' -ClassName AntiVirusProduct)
         foreach ($a in $av) {
             $hex = '{0:X6}' -f [int]$a.productState
             $on = $hex.Substring(2, 2) -in '10', '11'
             $upd = $hex.Substring(4, 2) -eq '00'
-            Add-DiagItem $s ("Antivirus : {0}" -f $a.displayName) ('{0} · {1}' -f $(if ($on) { 'actif' } else { 'inactif' }), $(if ($upd) { 'à jour' } else { 'signatures anciennes' })) $(if ($on -and $upd) { 'OK' } elseif ($on) { 'Warn' } else { 'Info' })
+            Add-DiagItem $s ((Get-Text 'Win.093') -f $a.displayName) ('{0} · {1}' -f $(if ($on) { (Get-Text 'Win.094') } else { (Get-Text 'Win.095') }), $(if ($upd) { (Get-Text 'Win.096') } else { (Get-Text 'Win.097') })) $(if ($on -and $upd) { 'OK' } elseif ($on) { 'Warn' } else { 'Info' })
         }
-        if (-not $av) { Add-DiagItem $s 'Antivirus' 'Aucun antivirus déclaré' 'Crit' }
+        if (-not $av) { Add-DiagItem $s (Get-Text 'Win.098') (Get-Text 'Win.099') 'Crit' }
         $fw = @(Get-NetFirewallProfile -ErrorAction SilentlyContinue)
-        if ($fw) { Add-DiagItem $s 'Pare-feu Windows' (($fw | ForEach-Object { '{0} : {1}' -f $_.Name, $(if ($_.Enabled) { 'actif' } else { 'inactif' }) }) -join ' · ') $(if (@($fw | Where-Object { -not $_.Enabled }).Count) { 'Warn' } else { 'OK' }) }
+        if ($fw) { Add-DiagItem $s (Get-Text 'Win.100') (($fw | ForEach-Object { '{0} : {1}' -f $_.Name, $(if ($_.Enabled) { (Get-Text 'Win.101') } else { (Get-Text 'Win.102') }) }) -join ' · ') $(if (@($fw | Where-Object { -not $_.Enabled }).Count) { 'Warn' } else { 'OK' }) }
         $uac = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -ErrorAction SilentlyContinue).EnableLUA
-        Add-DiagItem $s 'Contrôle de compte (UAC)' $(if ($uac -eq 1) { 'Activé' } else { 'Désactivé' }) $(if ($uac -eq 1) { 'OK' } else { 'Crit' })
+        Add-DiagItem $s (Get-Text 'Win.103') $(if ($uac -eq 1) { (Get-Text 'Win.104') } else { (Get-Text 'Win.105') }) $(if ($uac -eq 1) { 'OK' } else { 'Crit' })
     }
 
-    Update-DiagProgress $Ctx 100 'Terminé'
+    Update-DiagProgress $Ctx 100 (Get-Text 'Win.106')
     $r
 }
 

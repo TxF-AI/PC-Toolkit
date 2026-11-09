@@ -18,13 +18,31 @@ $script:Current = $null
 
 function Get-SupportedLanguage { <# Codes de langue gérés. #> @($script:Supported) }
 
+function Read-LangFile {
+    <# Lit un dictionnaire .psd1 par son arbre syntaxique (Import-PowerShellDataFile refuse plus de 500 clés). Aucun code n'est exécuté. #>
+    param([string]$Path)
+    $d = @{}
+    $t = $null; $e = $null
+    $ast = [Management.Automation.Language.Parser]::ParseFile($Path, [ref]$t, [ref]$e)
+    $h = $ast.Find({ param($n) $n -is [Management.Automation.Language.HashtableAst] }, $true)
+    if ($h) {
+        foreach ($kv in $h.KeyValuePairs) {
+            $k = $kv.Item1; $v = $kv.Item2.PipelineElements[0].Expression
+            if ($k -is [Management.Automation.Language.StringConstantExpressionAst] -and $v -is [Management.Automation.Language.StringConstantExpressionAst]) { $d[$k.Value] = $v.Value }
+        }
+    }
+    $d
+}
+
+function Get-LanguageData { <# Dictionnaire complet d'une langue (tests, outils). #> param([string]$Code) Read-Dictionary $Code }
+
 function Read-Dictionary {
     param([string]$Code)
     if ($script:Dict.ContainsKey($Code)) { return $script:Dict[$Code] }
     $d = @{}
     try {
         $f = Join-Path $script:LangDir "$Code.psd1"
-        if (Test-Path -LiteralPath $f) { $d = Import-PowerShellDataFile -LiteralPath $f }
+        if (Test-Path -LiteralPath $f) { $d = Read-LangFile $f }
     } catch { $d = @{} }
     $script:Dict[$Code] = $d
     $d
@@ -83,4 +101,4 @@ function Get-Text {
     } catch { $Key }
 }
 
-Export-ModuleMember -Function Get-Text, Get-AppLanguage, Set-AppLanguage, Get-SupportedLanguage, Get-DefaultLanguage
+Export-ModuleMember -Function Get-LanguageData, Get-Text, Get-AppLanguage, Set-AppLanguage, Get-SupportedLanguage, Get-DefaultLanguage

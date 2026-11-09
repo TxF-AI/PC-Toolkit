@@ -214,7 +214,7 @@ function ConvertTo-DataView($Table) {
     foreach ($c in @($Table.Columns)) {
         $safe = ([string]$c) -replace '[\.\/\[\]\(\)]', ' '
         while ($dt.Columns.Contains($safe)) { $safe += ' ' }
-        [void]$dt.Columns.Add($safe); $map[[string]$c] = $safe
+        [void]$dt.Columns.Add($safe); $dt.Columns[$safe].Caption = [string]$c; $map[[string]$c] = $safe
     }
     foreach ($r in @($Table.Rows)) {
         $row = $dt.NewRow()
@@ -292,6 +292,7 @@ function Add-SectionCard($Section) {
         if (@($t.Rows).Count -eq 0) { $e = New-Text 'Aucune entrée' 12 '#6B5B5F'; [void]$sp.Children.Add($e); continue }
         $dg = New-Object Windows.Controls.DataGrid
         $dg.AutoGenerateColumns = $true
+        $dg.Add_AutoGeneratingColumn({ param($s, $e) try { $e.Column.Header = Get-ColumnLabel $s.ItemsSource.Table.Columns[$e.PropertyName].Caption } catch { } })
         $dg.ItemsSource = ConvertTo-DataView $t
         $dg.MaxHeight = 340
         $dg.HorizontalScrollBarVisibility = 'Auto'

@@ -49,16 +49,16 @@ function Write-AppLog {
 
 function Format-Bytes {
     param([double]$Bytes)
-    if ($Bytes -ge 1TB) { return '{0:N2} To' -f ($Bytes / 1TB) }
-    if ($Bytes -ge 1GB) { return '{0:N1} Go' -f ($Bytes / 1GB) }
-    if ($Bytes -ge 1MB) { return '{0:N0} Mo' -f ($Bytes / 1MB) }
-    if ($Bytes -ge 1KB) { return '{0:N0} Ko' -f ($Bytes / 1KB) }
-    return '{0:N0} o' -f $Bytes
+    if ($Bytes -ge 1TB) { return '{0:N2} {1}' -f ($Bytes / 1TB), (Get-Text 'Unit.TB') }
+    if ($Bytes -ge 1GB) { return '{0:N1} {1}' -f ($Bytes / 1GB), (Get-Text 'Unit.GB') }
+    if ($Bytes -ge 1MB) { return '{0:N0} {1}' -f ($Bytes / 1MB), (Get-Text 'Unit.MB') }
+    if ($Bytes -ge 1KB) { return '{0:N0} {1}' -f ($Bytes / 1KB), (Get-Text 'Unit.KB') }
+    return '{0:N0} {1}' -f $Bytes, (Get-Text 'Unit.B')
 }
 
 function Format-Span {
     param([TimeSpan]$Span)
-    if ($Span.TotalDays -ge 1) { return '{0} j {1} h {2:00} min' -f [int][math]::Floor($Span.TotalDays), $Span.Hours, $Span.Minutes }
+    if ($Span.TotalDays -ge 1) { return '{0} {3} {1} h {2:00} min' -f [int][math]::Floor($Span.TotalDays), $Span.Hours, $Span.Minutes, (Get-Text 'Unit.Day') }
     if ($Span.TotalHours -ge 1) { return '{0} h {1:00} min' -f $Span.Hours, $Span.Minutes }
     return '{0} min' -f [int]$Span.TotalMinutes
 }
@@ -156,7 +156,7 @@ function Add-DiagItem {
         [string]$Detail = ''
     )
     if ($null -eq $Value -or "$Value" -eq '') {
-        $Value = 'Non disponible'
+        $Value = Get-Text 'Core.NA'
         if ($Status -eq 'Info') { $Status = 'NA' }
     }
     [void]$Section.Items.Add([pscustomobject]@{ Label = $Label; Value = "$Value"; Status = $Status; Detail = $Detail })
@@ -173,6 +173,13 @@ function Add-DiagTable {
         [pscustomobject]$o
     }
     [void]$Section.Tables.Add([pscustomobject]@{ Title = $Title; Columns = @($Columns); Rows = @($clean) })
+}
+
+function Get-ColumnLabel {
+    <# En-tête de colonne affiché : clé Col.<nom interne> du dictionnaire, sinon le nom interne (les noms internes restent en français). #>
+    param([string]$Name)
+    $t = Get-Text "Col.$Name"
+    if ($t -eq "Col.$Name") { $Name } else { $t }
 }
 
 function Add-DiagNote {
@@ -192,7 +199,10 @@ function Get-DiagStats {
 
 #region Historique ----------------------------------------------------------------------
 
-$script:ModuleTitles = @{ Dashboard = 'Tableau de bord'; Hardware = 'Diagnostic matériel'; Network = 'Diagnostic réseau'; Windows = 'Analyse Windows'; Storage = 'Analyse du stockage'; Audio = 'Diagnostic audio'; Bilan = 'Bilan avant / après'; Security = 'Security Guard' }
+function Get-ModuleTitle([string]$Module) {
+    # Titre d'un module dans la langue courante (clé Mod.<Module>) ; le nom brut si inconnu
+    if ($Module -in 'Dashboard', 'Hardware', 'Network', 'Windows', 'Storage', 'Audio', 'Bilan', 'Security') { Get-Text "Mod.$Module" } else { $Module }
+}
 
 function Save-DiagHistory {
     <#
@@ -218,7 +228,7 @@ function Get-DiagHistory {
             # Voie rapide : résumé lu dans le nom du fichier
             if ($_.Name -match $rx) {
                 $d = $Matches[1]; $h = $Matches[2]
-                $title = if ($script:ModuleTitles.ContainsKey($Matches[3])) { $script:ModuleTitles[$Matches[3]] } else { $Matches[3] }
+                $title = Get-ModuleTitle $Matches[3]
                 return [pscustomobject]@{
                     Date      = '{0}-{1}-{2} {3}:{4}:{5}' -f $d.Substring(0, 4), $d.Substring(4, 2), $d.Substring(6, 2), $h.Substring(0, 2), $h.Substring(2, 2), $h.Substring(4, 2)
                     Module    = $title
@@ -226,7 +236,7 @@ function Get-DiagHistory {
                     Alertes   = [int]$Matches[5]
                     OK        = [int]$Matches[6]
                     Durée     = '{0} s' -f $Matches[7]
-                    Admin     = if ($Matches[8] -eq '1') { 'Oui' } else { 'Non' }
+                    Admin     = if ($Matches[8] -eq '1') { Get-Text 'Core.Yes' } else { Get-Text 'Core.No' }
                     Path      = $_.FullName
                 }
             }
@@ -241,7 +251,7 @@ function Get-DiagHistory {
                     Alertes   = $st.Warn
                     OK        = $st.OK
                     Durée     = '{0} s' -f $j.DurationSec
-                    Admin     = if ($j.IsAdmin) { 'Oui' } else { 'Non' }
+                    Admin     = if ($j.IsAdmin) { Get-Text 'Core.Yes' } else { Get-Text 'Core.No' }
                     Path      = $_.FullName
                 }
             } catch { Write-AppLog "Historique illisible : $($_.FullName)" 'WARN' }
@@ -269,11 +279,11 @@ function Export-DiagHtml {
     # Le bilan « avant / après » (paramètre -Bilan, ou présent dans -Results) est toujours placé à la fin du rapport
     $bil = if ($Bilan) { $Bilan } else { @($Results | Where-Object { $_.Module -eq 'Bilan' }) | Select-Object -Last 1 }
     $all = @(@($Results | Where-Object { $_.Module -ne 'Bilan' }) + @($bil | Where-Object { $_ }))
-    $label = @{ OK = 'OK'; Warn = 'À surveiller'; Crit = 'Problème'; Info = 'Info'; NA = 'N/D' }
+    $label = @{}; foreach ($s in 'OK', 'Warn', 'Crit', 'Info', 'NA') { $label[$s] = Get-Text "Status.$s" }
     $sb = New-Object System.Text.StringBuilder
+    [void]$sb.AppendFormat('<!DOCTYPE html><html lang="{0}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' + "`n" + '<title>{1}</title>', (Get-AppLanguage), (ConvertTo-HtmlSafe (Get-Text 'Html.Title')))
     [void]$sb.Append(@'
-<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Rapport PC Toolkit</title><style>
+<style>
 :root{--bg:#0b0709;--card:#150a0d;--line:#2e1016;--text:#f2e6e8;--muted:#9c8a8e;--accent:#ff2a3d;--ok:#3ddc84;--warn:#ffb020;--info:#6ea8fe;--na:#6b5b5f}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 "Segoe UI",system-ui,sans-serif;padding:32px 16px}
 main{max-width:1100px;margin:0 auto}h1{font-family:Bahnschrift,"Segoe UI",sans-serif;font-weight:600;color:var(--accent);text-shadow:0 0 14px rgba(255,42,61,.55);margin:0 0 4px;font-size:30px;letter-spacing:.5px}
@@ -290,18 +300,18 @@ table{width:100%;border-collapse:collapse;font-size:12.5px}th{text-align:left;co
 @media(max-width:700px){.item{grid-template-columns:1fr}}
 </style></head><body><main>
 '@)
-    [void]$sb.AppendFormat('<h1>&#x26A1;&#xFE0E; PC//TOOLKIT</h1><div class="sub">Rapport généré le {0:dd/MM/yyyy à HH:mm} sur {1} · PC Toolkit {2}</div>', (Get-Date), (ConvertTo-HtmlSafe $env:COMPUTERNAME), (Get-AppVersion))
+    [void]$sb.AppendFormat('<h1>&#x26A1;&#xFE0E; PC//TOOLKIT</h1><div class="sub">{0}</div>', (ConvertTo-HtmlSafe (Get-Text 'Html.Generated' (Get-Date) $env:COMPUTERNAME (Get-AppVersion))))
 
     foreach ($r in $all) {
         if ($r.Module -eq 'Bilan') {
-            [void]$sb.AppendFormat('<h2>&#x1F4CA; {0}</h2><div class="meta">Mesuré le {1}</div>', (ConvertTo-HtmlSafe $r.Title), (ConvertTo-HtmlSafe $r.Date))
+            [void]$sb.AppendFormat('<h2>&#x1F4CA; {0}</h2><div class="meta">{1}</div>', (ConvertTo-HtmlSafe $r.Title), (ConvertTo-HtmlSafe (Get-Text 'Html.Measured' $r.Date)))
         } else {
             $st = Get-DiagStats $r
-            [void]$sb.AppendFormat('<h2>{0}</h2><div class="meta">Exécuté le {1} · durée {2} s · mode {3}{4}</div>',
-                (ConvertTo-HtmlSafe $r.Title), (ConvertTo-HtmlSafe $r.Date), $r.DurationSec,
-                $(if ($r.IsAdmin) { 'administrateur' } else { 'standard (certaines mesures nécessitent les droits administrateur)' }),
-                $(if ($r.Cancelled) { ' · <b>analyse interrompue</b>' } else { '' }))
-            [void]$sb.AppendFormat('<div class="sum"><span class="b b-Crit">{0} problème(s)</span><span class="b b-Warn">{1} à surveiller</span><span class="b b-OK">{2} OK</span></div>', $st.Crit, $st.Warn, $st.OK)
+            [void]$sb.AppendFormat('<h2>{0}</h2><div class="meta">{1}{2}</div>',
+                (ConvertTo-HtmlSafe $r.Title),
+                (ConvertTo-HtmlSafe (Get-Text 'Html.Run' $r.Date $r.DurationSec $(if ($r.IsAdmin) { Get-Text 'Html.Admin' } else { Get-Text 'Html.Standard' }))),
+                $(if ($r.Cancelled) { ' · <b>' + (ConvertTo-HtmlSafe (Get-Text 'Html.Interrupted')) + '</b>' } else { '' }))
+            [void]$sb.AppendFormat('<div class="sum"><span class="b b-Crit">{0}</span><span class="b b-Warn">{1}</span><span class="b b-OK">{2}</span></div>', (Get-Text 'Sum.Crit' $st.Crit), (Get-Text 'Sum.Warn' $st.Warn), (Get-Text 'Sum.OK' $st.OK))
         }
 
         foreach ($s in @($r.Sections)) {
@@ -316,21 +326,21 @@ table{width:100%;border-collapse:collapse;font-size:12.5px}th{text-align:left;co
                 if ($t.Title) { [void]$sb.AppendFormat('<h4>{0}</h4>', (ConvertTo-HtmlSafe $t.Title)) }
                 $cols = @($t.Columns)
                 [void]$sb.Append('<div class="tw"><table><tr>')
-                foreach ($c in $cols) { [void]$sb.AppendFormat('<th>{0}</th>', (ConvertTo-HtmlSafe $c)) }
+                foreach ($c in $cols) { [void]$sb.AppendFormat('<th>{0}</th>', (ConvertTo-HtmlSafe (Get-ColumnLabel $c))) }
                 [void]$sb.Append('</tr>')
                 foreach ($row in @($t.Rows)) {
                     [void]$sb.Append('<tr>')
                     foreach ($c in $cols) { [void]$sb.AppendFormat('<td>{0}</td>', (ConvertTo-HtmlSafe $row.$c)) }
                     [void]$sb.Append('</tr>')
                 }
-                if (@($t.Rows).Count -eq 0) { [void]$sb.AppendFormat('<tr><td colspan="{0}" class="det">Aucune entrée</td></tr>', [math]::Max(1, $cols.Count)) }
+                if (@($t.Rows).Count -eq 0) { [void]$sb.AppendFormat('<tr><td colspan="{0}" class="det">{1}</td></tr>', [math]::Max(1, $cols.Count), (Get-Text 'Html.NoEntry')) }
                 [void]$sb.Append('</table></div>')
             }
             foreach ($n in @($s.Notes)) { [void]$sb.AppendFormat('<div class="note">{0}</div>', (ConvertTo-HtmlSafe $n)) }
             [void]$sb.Append('</div>')
         }
     }
-    [void]$sb.Append('<div class="foot">PC Toolkit — diagnostics en lecture seule. Les valeurs « Non disponible » ne sont pas exposées par le matériel ou Windows : elles ne sont jamais estimées.</div></main></body></html>')
+    [void]$sb.AppendFormat('<div class="foot">{0}</div></main></body></html>', (ConvertTo-HtmlSafe (Get-Text 'Html.Foot')))
     [IO.File]::WriteAllText($Path, $sb.ToString(), (New-Object System.Text.UTF8Encoding($true)))
     $Path
 }
@@ -348,13 +358,13 @@ function Format-TextTable {
     $w = @{}
     foreach ($c in $cols) {
         $len = ($rows | ForEach-Object { (& $cut $_.$c).Length } | Measure-Object -Maximum).Maximum
-        $w[$c] = [math]::Max(([string]$c).Length, [int]$len)
+        $w[$c] = [math]::Max((Get-ColumnLabel $c).Length, [int]$len)
     }
     $lines = New-Object System.Collections.Generic.List[string]
-    $lines.Add('    ' + (($cols | ForEach-Object { ([string]$_).PadRight($w[$_]) }) -join '  '))
+    $lines.Add('    ' + (($cols | ForEach-Object { (Get-ColumnLabel $_).PadRight($w[$_]) }) -join '  '))
     $lines.Add('    ' + (($cols | ForEach-Object { '-' * $w[$_] }) -join '  '))
     foreach ($r in $rows) { $lines.Add('    ' + (($cols | ForEach-Object { (& $cut $r.$_).PadRight($w[$_]) }) -join '  ')) }
-    if (-not $rows.Count) { $lines.Add('    (aucune entrée)') }
+    if (-not $rows.Count) { $lines.Add('    (' + (Get-Text 'Txt.NoEntry') + ')') }
     $lines
 }
 
@@ -365,13 +375,13 @@ function Format-BilanText {
     $t = @($Result.Sections | ForEach-Object { $_.Tables } | Where-Object { $_ })[0]
     if (-not $t) { return $lines }
     $cols = @($t.Columns); $rows = @($t.Rows)
-    $head = @{}; foreach ($c in $cols) { $head[$c] = ([string]$c).ToUpper() -replace '^GAIN NET$', 'GAIN / NET' }
+    $head = @{}; foreach ($c in $cols) { $head[$c] = (Get-ColumnLabel $c).ToUpper() -replace '^GAIN NET$', 'GAIN / NET' }
     $w = @{}
     foreach ($c in $cols) { $w[$c] = [math]::Max($head[$c].Length, [int](($rows | ForEach-Object { ([string]$_.$c).Length } | Measure-Object -Maximum).Maximum)) }
     $width = [math]::Max(70, (($cols | ForEach-Object { $w[$_] } | Measure-Object -Sum).Sum + 3 * ($cols.Count - 1)))
     $lines.Add(''); $lines.Add('')
     $lines.Add('=' * $width)
-    $lines.Add(('  {0} BILAN D''OPTIMISATION - PC TOOLKIT' -f [char]::ConvertFromUtf32(0x1F4CA)))
+    $lines.Add(('  {0} {1}' -f [char]::ConvertFromUtf32(0x1F4CA), (Get-Text 'Txt.BilanTitle')))
     $lines.Add('=' * $width)
     $lines.Add(($cols | ForEach-Object { $head[$_].PadRight($w[$_]) }) -join ' | ')
     $lines.Add('-' * $width)
@@ -391,20 +401,20 @@ function Export-DiagText {
     # Le bilan « avant / après » (paramètre -Bilan, ou présent dans -Results) est toujours placé à la fin du rapport
     $bil = if ($Bilan) { $Bilan } else { @($Results | Where-Object { $_.Module -eq 'Bilan' }) | Select-Object -Last 1 }
     $main = @($Results | Where-Object { $_.Module -ne 'Bilan' })
-    $tag = @{ OK = '[  OK  ]'; Warn = '[ATTENT]'; Crit = '[ PROB ]'; Info = '[ INFO ]'; NA = '[ N/D  ]' }
+    $tag = @{}; foreach ($s in 'OK', 'Warn', 'Crit', 'Info', 'NA') { $tag[$s] = Get-Text "Tag.$s" }
     $out = New-Object System.Collections.Generic.List[string]
     $line = '=' * 78
     $out.Add($line)
-    $out.Add(('  {0} PC//TOOLKIT — rapport du {1:dd/MM/yyyy à HH:mm} — {2} — v{3}' -f [char]0x26A1, (Get-Date), $env:COMPUTERNAME, (Get-AppVersion)))
+    $out.Add(('  {0} PC//TOOLKIT — {1}' -f [char]0x26A1, (Get-Text 'Txt.Header' (Get-Date) $env:COMPUTERNAME (Get-AppVersion))))
     $out.Add($line)
-    $out.Add('  Légende : [ PROB ] problème · [ATTENT] à surveiller · [  OK  ] · [ INFO ] · [ N/D  ] non disponible')
+    $out.Add('  ' + (Get-Text 'Txt.Legend'))
     foreach ($r in $main) {
         $st = Get-DiagStats $r
         $out.Add(''); $out.Add('')
         $out.Add('#' * 78)
         $out.Add(('  {0}' -f ([string]$r.Title).ToUpper()))
-        $out.Add(('  Exécuté le {0} · {1} s · mode {2}{3}' -f $r.Date, $r.DurationSec, $(if ($r.IsAdmin) { 'administrateur' } else { 'standard' }), $(if ($r.Cancelled) { ' · INTERROMPU' } else { '' })))
-        $out.Add(('  Bilan : {0} problème(s), {1} à surveiller, {2} OK' -f $st.Crit, $st.Warn, $st.OK))
+        $out.Add('  ' + (Get-Text 'Txt.Run' $r.Date $r.DurationSec $(if ($r.IsAdmin) { Get-Text 'Html.Admin' } else { Get-Text 'Txt.Standard' }) $(if ($r.Cancelled) { ' · ' + (Get-Text 'Txt.Interrupted') } else { '' })))
+        $out.Add('  ' + (Get-Text 'Txt.Summary' $st.Crit $st.Warn $st.OK))
         $out.Add('#' * 78)
         foreach ($s in @($r.Sections)) {
             $out.Add('')
@@ -423,7 +433,7 @@ function Export-DiagText {
     }
     if ($bil) { foreach ($l in (Format-BilanText $bil)) { $out.Add($l) } }
     $out.Add(''); $out.Add($line)
-    $out.Add('  Diagnostics en lecture seule. « Non disponible » = valeur non exposée par Windows, jamais estimée.')
+    $out.Add('  ' + (Get-Text 'Txt.Foot'))
     $out.Add($line)
     [IO.File]::WriteAllLines($Path, $out, (New-Object System.Text.UTF8Encoding($true)))
     $Path

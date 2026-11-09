@@ -62,10 +62,10 @@ function Get-AudioEndpoints {
             }
             $out += [pscustomobject]@{
                 Key      = $k.PSChildName.ToLower()
-                Flow     = $(if ($flow -eq 'Render') { 'Sortie' } else { 'Entrée' })
+                Flow     = $(if ($flow -eq 'Render') { (Get-Text 'Aud.005') } else { (Get-Text 'Aud.006') })
                 Name     = $p.$script:PKEY_Name
                 Device   = $p.$script:PKEY_Adapter
-                State    = switch ($state) { 1 { 'Actif' } 2 { 'Désactivé' } 4 { 'Absent' } 8 { 'Débranché' } default { "$state" } }
+                State    = switch ($state) { 1 { (Get-Text 'Aud.007') } 2 { (Get-Text 'Aud.008') } 4 { (Get-Text 'Aud.009') } 8 { (Get-Text 'Aud.010') } default { "$state" } }
                 Rate     = $rate
                 Bits     = $bits
                 Channels = $ch
@@ -81,7 +81,7 @@ function Get-DefaultAudioEndpoint {
     $id = [PCToolkit.AudioDefault]::GetId($(if ($Flow -eq 'Render') { 0 } else { 1 }), 1)
     if (-not $id) { return $null }
     $key = ($id -split '\.')[-1].ToLower()     # « {0.0.0.00000000}.{guid} » -> « {guid} »
-    $ep = Get-AudioEndpoints | Where-Object { $_.Key -eq $key -and $_.Flow -eq $(if ($Flow -eq 'Render') { 'Sortie' } else { 'Entrée' }) } | Select-Object -First 1
+    $ep = Get-AudioEndpoints | Where-Object { $_.Key -eq $key -and $_.Flow -eq $(if ($Flow -eq 'Render') { (Get-Text 'Aud.014') } else { (Get-Text 'Aud.015') }) } | Select-Object -First 1
     if ($ep) { $ep | Add-Member -NotePropertyName EndpointId -NotePropertyValue $id -PassThru }
 }
 
@@ -136,13 +136,13 @@ function Get-AudioDeviceInfo {
 function Get-AsioDrivers {
     <# Pilotes ASIO déclarés (64 et 32 bits) avec vérification de la DLL associée. #>
     $out = @()
-    foreach ($view in @(@{ Key = 'HKLM:\SOFTWARE\ASIO'; Arch = '64 bits'; Cls = 'HKLM:\SOFTWARE\Classes\CLSID' },
-                        @{ Key = 'HKLM:\SOFTWARE\WOW6432Node\ASIO'; Arch = '32 bits'; Cls = 'HKLM:\SOFTWARE\Classes\WOW6432Node\CLSID' })) {
+    foreach ($view in @(@{ Key = 'HKLM:\SOFTWARE\ASIO'; Arch = (Get-Text 'Aud.023'); Cls = 'HKLM:\SOFTWARE\Classes\CLSID' },
+                        @{ Key = 'HKLM:\SOFTWARE\WOW6432Node\ASIO'; Arch = (Get-Text 'Aud.024'); Cls = 'HKLM:\SOFTWARE\Classes\WOW6432Node\CLSID' })) {
         foreach ($k in Get-ChildItem $view.Key -ErrorAction SilentlyContinue) {
             $p = Get-ItemProperty $k.PSPath -ErrorAction SilentlyContinue
             $dll = (Get-ItemProperty (Join-Path $view.Cls "$($p.CLSID)\InprocServer32") -ErrorAction SilentlyContinue).'(default)'
             $exists = if ($dll) { Test-Path -LiteralPath ([Environment]::ExpandEnvironmentVariables($dll)) } else { $false }
-            $out += [pscustomobject]@{ Nom = $k.PSChildName; Architecture = $view.Arch; Fichier = $dll; Présent = $(if ($exists) { 'Oui' } else { 'Non' }) }
+            $out += [pscustomobject]@{ Nom = $k.PSChildName; Architecture = $view.Arch; Fichier = $dll; Présent = $(if ($exists) { Get-Text 'Core.Yes' } else { Get-Text 'Core.No' }) }
         }
     }
     $out
@@ -158,103 +158,115 @@ function Get-UsbSelectiveSuspend {
     $null
 }
 
+function Get-AudioTypeLabel {
+    <# Libellé affiché d'un type de connexion (les valeurs internes du type restent en français : elles servent de repères au code). #>
+    param([string]$Type)
+    switch ($Type) {
+        'Carte mère (HD Audio)'     { Get-Text 'Aud.TypeHD' }
+        'Virtuel (logiciel)'        { Get-Text 'Aud.TypeVirtual' }
+        'Autre'                     { Get-Text 'Aud.TypeOther' }
+        'USB (pilote du fabricant)' { Get-Text 'Aud.TypeUsbVendor' }
+        default                     { $Type }
+    }
+}
+
 function Add-DefaultDeviceItems {
     <# Remplit une section avec la description d'un périphérique par défaut (sortie ou entrée). #>
     param($Section, $Endpoint, $Info, [string]$Kind)
-    if (-not $Endpoint) { Add-DiagItem $Section "$Kind par défaut" 'Aucune' 'Warn' 'Aucun périphérique par défaut : vérifiez Paramètres > Système > Son.'; return }
-    Add-DiagItem $Section "$Kind par défaut" ('{0} — {1}' -f $Endpoint.Name, $Endpoint.Device) 'OK'
+    if (-not $Endpoint) { Add-DiagItem $Section (Get-Text 'Aud.025' $Kind) (Get-Text 'Aud.026') 'Warn' (Get-Text 'Aud.027'); return }
+    Add-DiagItem $Section (Get-Text 'Aud.028' $Kind) ('{0} — {1}' -f $Endpoint.Name, $Endpoint.Device) 'OK'
     if ($Info) {
-        Add-DiagItem $Section 'Type de connexion' $Info.Type 'Info'
-        Add-DiagItem $Section 'État du périphérique' $Info.Status $(if ($Info.Status -eq 'OK') { 'OK' } else { 'Crit' })
-        Add-DiagItem $Section 'Pilote' ('{0} {1}' -f $Info.Provider, $Info.Driver).Trim() 'Info'
+        Add-DiagItem $Section (Get-Text 'Aud.029') (Get-AudioTypeLabel $Info.Type) 'Info'
+        Add-DiagItem $Section (Get-Text 'Aud.030') $Info.Status $(if ($Info.Status -eq 'OK') { 'OK' } else { 'Crit' })
+        Add-DiagItem $Section (Get-Text 'Aud.031') ('{0} {1}' -f $Info.Provider, $Info.Driver).Trim() 'Info'
         switch ($Info.Type) {
-            'Bluetooth' { Add-DiagItem $Section 'Latence Bluetooth' 'Élevée par nature (100 à 250 ms)' 'Info' 'Décalage audio normal en Bluetooth. Pour jouer en compétitif ou faire de la musique, préférez un casque filaire ou un dongle 2,4 GHz.' }
+            'Bluetooth' { Add-DiagItem $Section (Get-Text 'Aud.032') (Get-Text 'Aud.033') 'Info' (Get-Text 'Aud.034') }
             { $_ -like 'USB*' } {
-                if ($Info.Hub) { Add-DiagItem $Section 'Branchement USB' "Via un hub ($($Info.Hub))" 'Warn' 'Un hub USB partagé (façade du boîtier, multiprise USB) peut provoquer craquements et coupures. Préférez un port arrière de la carte mère.' }
-                else { Add-DiagItem $Section 'Branchement USB' 'Port direct de la carte mère' 'OK' }
+                if ($Info.Hub) { Add-DiagItem $Section (Get-Text 'Aud.035') (Get-Text 'Aud.036' $($Info.Hub)) 'Warn' (Get-Text 'Aud.037') }
+                else { Add-DiagItem $Section (Get-Text 'Aud.038') (Get-Text 'Aud.039') 'OK' }
             }
-            'Virtuel (logiciel)' { Add-DiagItem $Section 'Périphérique virtuel' 'Le son passe par un logiciel (Voicemeeter, VB-Cable, Sonar…)' 'Info' 'En cas de souci, vérifiez d''abord ce logiciel et le périphérique réel vers lequel il renvoie le son.' }
+            'Virtuel (logiciel)' { Add-DiagItem $Section (Get-Text 'Aud.040') (Get-Text 'Aud.041') 'Info' (Get-Text 'Aud.042') }
         }
     }
-    if ($Endpoint.Rate) { Add-DiagItem $Section 'Format partagé Windows' ('{0:N1} kHz · {1} bits · {2} canal(aux)' -f ($Endpoint.Rate / 1000), $Endpoint.Bits, $Endpoint.Channels) 'Info' }
+    if ($Endpoint.Rate) { Add-DiagItem $Section (Get-Text 'Aud.043') ((Get-Text 'Aud.044') -f ($Endpoint.Rate / 1000), $Endpoint.Bits, $Endpoint.Channels) 'Info' }
 }
 
 function Invoke-AudioDiagnostic {
     param($Ctx)
-    $r = New-DiagResult -Module 'Audio' -Title 'Diagnostic audio' -Ctx $Ctx
+    $r = New-DiagResult -Module (Get-Text 'Aud.045') -Title (Get-Text 'Aud.046') -Ctx $Ctx
 
-    Update-DiagProgress $Ctx 5 'Recherche du périphérique audio par défaut…'
+    Update-DiagProgress $Ctx 5 (Get-Text 'Aud.047')
     $out = Get-DefaultAudioEndpoint 'Render'
     $in = Get-DefaultAudioEndpoint 'Capture'
     $outInfo = if ($out) { Get-AudioDeviceInfo $out.EndpointId }
     $inInfo = if ($in) { Get-AudioDeviceInfo $in.EndpointId }
 
     # --- Sortie / entrée par défaut ------------------------------------------------------
-    Add-DiagSection $r 'Sortie audio par défaut (haut-parleurs / casque)' -Body {
+    Add-DiagSection $r (Get-Text 'Aud.050') -Body {
         param($s)
-        Add-DefaultDeviceItems $s $out $outInfo 'Sortie'
+        Add-DefaultDeviceItems $s $out $outInfo (Get-Text 'Aud.051')
     }
-    Update-DiagProgress $Ctx 20 'Entrée audio par défaut…'
-    Add-DiagSection $r 'Entrée audio par défaut (micro)' -Body {
+    Update-DiagProgress $Ctx 20 (Get-Text 'Aud.052')
+    Add-DiagSection $r (Get-Text 'Aud.053') -Body {
         param($s)
-        Add-DefaultDeviceItems $s $in $inInfo 'Entrée'
+        Add-DefaultDeviceItems $s $in $inInfo (Get-Text 'Aud.054')
         # Même appareil en entrée et en sortie (interface, casque USB) : les fréquences doivent correspondre
         if ($out -and $in -and $outInfo -and $inInfo -and $outInfo.InstanceId -eq $inInfo.InstanceId -and $out.Rate -and $in.Rate) {
             if ($out.Rate -ne $in.Rate) {
-                Add-DiagItem $s 'Fréquences entrée / sortie' ('{0:N1} kHz / {1:N1} kHz' -f ($out.Rate / 1000), ($in.Rate / 1000)) 'Warn' 'Même appareil réglé à deux fréquences différentes : alignez-les (Panneau de configuration Son > Propriétés > Avancé), et utilisez la même dans votre logiciel audio.'
+                Add-DiagItem $s (Get-Text 'Aud.055') ((Get-Text 'Aud.056') -f ($out.Rate / 1000), ($in.Rate / 1000)) 'Warn' (Get-Text 'Aud.057')
             } else {
-                Add-DiagItem $s 'Fréquences entrée / sortie' ('{0:N1} kHz des deux côtés' -f ($out.Rate / 1000)) 'OK'
+                Add-DiagItem $s (Get-Text 'Aud.058') ((Get-Text 'Aud.059') -f ($out.Rate / 1000)) 'OK'
             }
         }
     }
 
     # --- Tous les périphériques ------------------------------------------------------------
-    Update-DiagProgress $Ctx 35 'Liste des périphériques audio…'
-    Add-DiagSection $r 'Tous les périphériques audio' -Body {
+    Update-DiagProgress $Ctx 35 (Get-Text 'Aud.060')
+    Add-DiagSection $r (Get-Text 'Aud.061') -Body {
         param($s)
         $eps = @(Get-AudioEndpoints)
-        $active = @($eps | Where-Object State -eq 'Actif')
-        Add-DiagItem $s 'Points de terminaison actifs' ('{0} sortie(s), {1} entrée(s)' -f @($active | Where-Object Flow -eq 'Sortie').Count, @($active | Where-Object Flow -eq 'Entrée').Count) 'Info'
+        $active = @($eps | Where-Object State -eq (Get-Text 'Aud.062'))
+        Add-DiagItem $s (Get-Text 'Aud.063') ((Get-Text 'Aud.064') -f @($active | Where-Object Flow -eq (Get-Text 'Aud.065')).Count, @($active | Where-Object Flow -eq (Get-Text 'Aud.066')).Count) 'Info'
         $duck = (Get-ItemProperty 'HKCU:\Software\Microsoft\Multimedia\Audio' -ErrorAction SilentlyContinue).UserDuckingPreference
-        if ($null -ne $duck) { Add-DiagItem $s 'Atténuation pendant les appels' $(switch ($duck) { 0 { 'Couper tous les autres sons' } 1 { 'Réduire de 80 %' } 2 { 'Réduire de 50 %' } 3 { 'Ne rien faire' } }) 'Info' 'Réglage Windows qui baisse le son pendant un appel (Discord, Teams…). Explique des baisses de volume « mystérieuses ».' }
+        if ($null -ne $duck) { Add-DiagItem $s (Get-Text 'Aud.067') $(switch ($duck) { 0 { (Get-Text 'Aud.068') } 1 { (Get-Text 'Aud.069') } 2 { (Get-Text 'Aud.070') } 3 { (Get-Text 'Aud.071') } }) 'Info' (Get-Text 'Aud.072') }
         $defKeys = @($out.Key, $in.Key)
-        $rows = $eps | Where-Object { $_.State -in 'Actif', 'Débranché' } | Sort-Object Flow, State, Name | ForEach-Object {
-            [pscustomobject]@{ 'Par défaut' = $(if ($defKeys -contains $_.Key) { '★' } else { '' }); Type = $_.Flow; Nom = $_.Name; Appareil = $_.Device; État = $_.State; Fréquence = $(if ($_.Rate) { '{0:N1} kHz' -f ($_.Rate / 1000) } else { '' }); Bits = $_.Bits; Canaux = $_.Channels }
+        $rows = $eps | Where-Object { $_.State -in (Get-Text 'Aud.073'), (Get-Text 'Aud.074') } | Sort-Object Flow, State, Name | ForEach-Object {
+            [pscustomobject]@{ 'Par défaut' = $(if ($defKeys -contains $_.Key) { '★' } else { '' }); Type = $_.Flow; Nom = $_.Name; Appareil = $_.Device; État = $_.State; Fréquence = $(if ($_.Rate) { (Get-Text 'Aud.075') -f ($_.Rate / 1000) } else { '' }); Bits = $_.Bits; Canaux = $_.Channels }
         }
-        Add-DiagTable $s 'Points de terminaison (★ = par défaut)' $rows
+        Add-DiagTable $s (Get-Text 'Aud.076') $rows
         $snd = @(Get-SafeCim Win32_SoundDevice)
         $bad = @($snd | Where-Object Status -ne 'OK')
-        Add-DiagItem $s 'Contrôleurs audio' ('{0} détecté(s), {1} en erreur' -f $snd.Count, $bad.Count) $(if ($bad.Count) { 'Warn' } else { 'OK' })
-        Add-DiagTable $s 'Contrôleurs (pilotes)' ($snd | ForEach-Object { [pscustomobject]@{ Nom = $_.Name; Fabricant = $_.Manufacturer; État = $_.Status } })
+        Add-DiagItem $s (Get-Text 'Aud.077') ((Get-Text 'Aud.078') -f $snd.Count, $bad.Count) $(if ($bad.Count) { 'Warn' } else { 'OK' })
+        Add-DiagTable $s (Get-Text 'Aud.079') ($snd | ForEach-Object { [pscustomobject]@{ Nom = $_.Name; Fabricant = $_.Manufacturer; État = $_.Status } })
     }
 
     # --- ASIO ----------------------------------------------------------------------------
-    Update-DiagProgress $Ctx 55 'Lecture des pilotes ASIO…'
-    Add-DiagSection $r 'Pilotes ASIO (musique assistée par ordinateur)' -Body {
+    Update-DiagProgress $Ctx 55 (Get-Text 'Aud.080')
+    Add-DiagSection $r (Get-Text 'Aud.081') -Body {
         param($s)
         $asio = @(Get-AsioDrivers)
-        Add-DiagItem $s 'Pilotes ASIO déclarés' $asio.Count 'Info'
-        $orph = @($asio | Where-Object Présent -eq 'Non')
-        if ($orph.Count) { Add-DiagItem $s 'Pilotes ASIO orphelins' (($orph.Nom) -join ', ') 'Warn' 'Déclarés mais leur fichier n''existe plus (restes de désinstallation). Sans danger, mais ils encombrent la liste des logiciels audio.' }
+        Add-DiagItem $s (Get-Text 'Aud.082') $asio.Count 'Info'
+        $orph = @($asio | Where-Object Présent -eq (Get-Text 'Core.No'))
+        if ($orph.Count) { Add-DiagItem $s (Get-Text 'Aud.083') (($orph.Nom) -join ', ') 'Warn' (Get-Text 'Aud.084') }
         if ($outInfo) {
             $brand = (($outInfo.Name, $out.Device) -join ' ' -split '[\s\(\)]+' | Where-Object { $_.Length -ge 4 -and $_ -notmatch '^(Audio|High|Definition|Device|USB|Speakers|Haut)' } | Select-Object -First 1)
             # À marque égale, on préfère le pilote qui correspond au branchement (USB, Thunderbolt…)
             $conn = if ($outInfo.Type -like 'USB*') { 'USB' } else { '' }
-            $match = if ($brand) { $asio | Where-Object { $_.Nom -match [regex]::Escape($brand) -and $_.Présent -eq 'Oui' } | Sort-Object { if ($conn -and $_.Nom -match $conn) { 0 } else { 1 } } | Select-Object -First 1 }
-            if ($match) { Add-DiagItem $s 'ASIO du périphérique par défaut' $match.Nom 'OK' 'Pilote dédié trouvé : c''est celui à choisir dans votre logiciel audio pour la latence la plus basse.' }
-            elseif ($asio.Count) { Add-DiagItem $s 'ASIO du périphérique par défaut' 'Aucun pilote dédié reconnu' 'Info' 'Normal pour une carte son intégrée, un casque ou du Bluetooth. Pour la musique, les génériques ASIO4ALL ou FlexASIO conviennent.' }
+            $match = if ($brand) { $asio | Where-Object { $_.Nom -match [regex]::Escape($brand) -and $_.Présent -eq (Get-Text 'Core.Yes') } | Sort-Object { if ($conn -and $_.Nom -match $conn) { 0 } else { 1 } } | Select-Object -First 1 }
+            if ($match) { Add-DiagItem $s (Get-Text 'Aud.085') $match.Nom 'OK' (Get-Text 'Aud.086') }
+            elseif ($asio.Count) { Add-DiagItem $s (Get-Text 'Aud.087') (Get-Text 'Aud.088') 'Info' (Get-Text 'Aud.089') }
         }
-        if ($asio.Count) { Add-DiagTable $s 'Liste' $asio } else { Add-DiagNote $s 'Aucun pilote ASIO : normal si vous ne faites pas de musique assistée par ordinateur.' }
+        if ($asio.Count) { Add-DiagTable $s (Get-Text 'Aud.090') $asio } else { Add-DiagNote $s (Get-Text 'Aud.091') }
     }
 
     # --- Focusrite (seulement si présente) ------------------------------------------------
     $foc = @(Get-PnpDevice -PresentOnly -ErrorAction SilentlyContinue | Where-Object { $_.FriendlyName -match 'Scarlett|Focusrite|Clarett|Vocaster' })
     $log = Join-Path $env:APPDATA 'Focusrite\Focusrite Control 2\fc2.log'
     if ($foc.Count -and (Test-Path -LiteralPath $log)) {
-        Update-DiagProgress $Ctx 65 'Journal Focusrite…'
-        Add-DiagSection $r 'Interface Focusrite (détectée)' -Body {
+        Update-DiagProgress $Ctx 65 (Get-Text 'Aud.093')
+        Add-DiagSection $r (Get-Text 'Aud.094') -Body {
             param($s)
-            Add-DiagItem $s 'Interface' (($foc | Select-Object -First 1).FriendlyName) 'Info'
+            Add-DiagItem $s (Get-Text 'Aud.095') (($foc | Select-Object -First 1).FriendlyName) 'Info'
             $lines = Get-Content -LiteralPath $log -Tail 5000 -ErrorAction SilentlyContinue | Select-String -Pattern 'Device removed' -SimpleMatch
             $events = foreach ($l in $lines) {
                 if ($l.Line -match '^(\d{1,2} \w{3} \d{4} \d{2}:\d{2}:\d{2})') {
@@ -264,23 +276,23 @@ function Invoke-AudioDiagnostic {
             }
             $events = @($events | Sort-Object -Descending)
             $recent = @($events | Where-Object { $_ -gt (Get-Date).AddDays(-14) })
-            Add-DiagItem $s 'Déconnexions (14 derniers jours)' $recent.Count $(if ($recent.Count -ge 3) { 'Warn' } else { 'Info' }) 'Source : journal Focusrite Control 2. Inclut les débranchements manuels et extinctions du PC.'
-            if ($events) { Add-DiagTable $s 'Dernières déconnexions' ($events | Select-Object -First 10 | ForEach-Object { [pscustomobject]@{ Date = $_.ToString('ddd dd/MM/yyyy HH:mm:ss') } }) }
+            Add-DiagItem $s (Get-Text 'Aud.098') $recent.Count $(if ($recent.Count -ge 3) { 'Warn' } else { 'Info' }) (Get-Text 'Aud.099')
+            if ($events) { Add-DiagTable $s (Get-Text 'Aud.100') ($events | Select-Object -First 10 | ForEach-Object { [pscustomobject]@{ Date = $_.ToString('ddd dd/MM/yyyy HH:mm:ss') } }) }
         }
     }
 
     # --- Système et latence -------------------------------------------------------------
-    Update-DiagProgress $Ctx 72 'Mesure indicative des interruptions (5 s)…'
-    Add-DiagSection $r 'Système et latence' -Body {
+    Update-DiagProgress $Ctx 72 (Get-Text 'Aud.102')
+    Add-DiagSection $r (Get-Text 'Aud.103') -Body {
         param($s)
         foreach ($svcName in 'Audiosrv', 'AudioEndpointBuilder') {
             $svc = Get-Service $svcName -ErrorAction SilentlyContinue
-            Add-DiagItem $s "Service $svcName" "$($svc.Status)" $(if ($svc.Status -eq 'Running') { 'OK' } else { 'Crit' })
+            Add-DiagItem $s (Get-Text 'Aud.106' $svcName) "$($svc.Status)" $(if ($svc.Status -eq 'Running') { 'OK' } else { 'Crit' })
         }
         $usbDefault = ($outInfo.Type -like 'USB*') -or ($inInfo.Type -like 'USB*')
         $uss = Get-UsbSelectiveSuspend
         $ussSt = if ($null -eq $uss) { 'NA' } elseif ($uss -eq 1 -and $usbDefault) { 'Warn' } elseif ($uss -eq 1) { 'Info' } else { 'OK' }
-        Add-DiagItem $s 'Suspension sélective USB (secteur)' $(if ($null -eq $uss) { $null } elseif ($uss -eq 1) { 'Activée' } else { 'Désactivée' }) $ussSt $(if ($usbDefault) { 'Votre périphérique audio par défaut est en USB : activée, Windows peut mettre son port en veille (cause connue de coupures).' } else { 'Concerne surtout les périphériques audio USB.' })
+        Add-DiagItem $s (Get-Text 'Aud.108') $(if ($null -eq $uss) { $null } elseif ($uss -eq 1) { (Get-Text 'Aud.109') } else { (Get-Text 'Aud.110') }) $ussSt $(if ($usbDefault) { (Get-Text 'Aud.111') } else { (Get-Text 'Aud.112') })
         $dpc = @(); $int = @()
         for ($i = 0; $i -lt 5; $i++) {
             if (Test-DiagCancel $Ctx) { break }
@@ -291,15 +303,15 @@ function Invoke-AudioDiagnostic {
         }
         if ($dpc.Count) {
             $dAvg = [math]::Round(($dpc | Measure-Object -Average).Average, 2); $dMax = ($dpc | Measure-Object -Maximum).Maximum
-            Add-DiagItem $s 'Temps CPU en DPC' ("moy. $dAvg % · max $dMax %") $(if ($dMax -ge 5) { 'Warn' } else { 'OK' }) 'Indicateur grossier des micro-coupures audio. Seul un outil comme LatencyMon mesure la latence par pilote.'
-            Add-DiagItem $s 'Interruptions par seconde' ('{0:N0}' -f ($int | Measure-Object -Average).Average) 'Info'
+            Add-DiagItem $s (Get-Text 'Aud.114') ((Get-Text 'Aud.115' $dAvg $dMax)) $(if ($dMax -ge 5) { 'Warn' } else { 'OK' }) (Get-Text 'Aud.116')
+            Add-DiagItem $s (Get-Text 'Aud.117') ('{0:N0}' -f ($int | Measure-Object -Average).Average) 'Info'
         }
         $apps = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '^(FL64|FL|Ableton.*|reaper|Cubase.*|Studio One|bitwig.*|Discord|obs64|Voicemeeter.*|GoXLR.*|SteelSeriesGG.*|NahimicSvc.*|WavesSvc.*|Focusrite Control 2|SonarStudioService|EqualizerAPO.*)$' } | Select-Object -ExpandProperty ProcessName -Unique
-        Add-DiagItem $s 'Logiciels audio ouverts' $(if ($apps) { $apps -join ', ' } else { 'Aucun parmi ceux surveillés' }) 'Info'
+        Add-DiagItem $s (Get-Text 'Aud.118') $(if ($apps) { $apps -join ', ' } else { (Get-Text 'Aud.119') }) 'Info'
     }
 
-    Update-DiagProgress $Ctx 100 'Terminé'
+    Update-DiagProgress $Ctx 100 (Get-Text 'Aud.120')
     $r
 }
 
-Export-ModuleMember -Function Invoke-AudioDiagnostic, Get-AudioEndpoints, Get-DefaultAudioEndpoint, Get-AudioDeviceInfo, Get-AsioDrivers, Get-UsbSelectiveSuspend
+Export-ModuleMember -Function Get-AudioTypeLabel, Invoke-AudioDiagnostic, Get-AudioEndpoints, Get-DefaultAudioEndpoint, Get-AudioDeviceInfo, Get-AsioDrivers, Get-UsbSelectiveSuspend

@@ -6,8 +6,15 @@ Get-ChildItem -LiteralPath $ModDir -Filter '*.psm1' | ForEach-Object { Import-Mo
 [void](Set-AppLanguage 'fr' -NoSave)
 
 Describe 'I18n' {
-    $fr = Import-PowerShellDataFile -LiteralPath (Join-Path $Root 'Lang\fr.psd1')
-    $en = Import-PowerShellDataFile -LiteralPath (Join-Path $Root 'Lang\en.psd1')
+    $fr = Get-LanguageData 'fr'
+    $en = Get-LanguageData 'en'
+
+    It 'les dictionnaires sont lus en entier (même nombre de clés que de lignes de définition)' {
+        foreach ($c in 'fr', 'en') {
+            $n = @(Select-String -LiteralPath (Join-Path $Root "Lang\$c.psd1") -Pattern "^\s+'[^']+'\s*=\s*'" ).Count
+            (Get-LanguageData $c).Count | Should Be $n
+        }
+    }
 
     It 'chaque clé FR a son équivalent EN' {
         $missing = @($fr.Keys | Where-Object { -not $en.ContainsKey($_) })

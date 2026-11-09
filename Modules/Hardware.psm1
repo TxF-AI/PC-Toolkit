@@ -30,116 +30,116 @@ function Get-GpuVramBytes {
 
 function Invoke-HardwareDiagnostic {
     param($Ctx)
-    $r = New-DiagResult -Module 'Hardware' -Title 'Diagnostic matériel' -Ctx $Ctx
+    $r = New-DiagResult -Module 'Hardware' -Title (Get-Text 'Hw.003') -Ctx $Ctx
 
     # --- Processeur ---------------------------------------------------------------
-    Update-DiagProgress $Ctx 5 'Lecture du processeur…'
-    Add-DiagSection $r 'Processeur' -Body {
+    Update-DiagProgress $Ctx 5 (Get-Text 'Hw.004')
+    Add-DiagSection $r (Get-Text 'Hw.005') -Body {
         param($s)
         $cpu = Get-SafeCim Win32_Processor | Select-Object -First 1
-        Add-DiagItem $s 'Modèle' ($cpu.Name.Trim())
-        Add-DiagItem $s 'Cœurs / threads' ('{0} cœurs · {1} threads' -f $cpu.NumberOfCores, $cpu.NumberOfLogicalProcessors)
-        Add-DiagItem $s 'Fréquence de base' ('{0:N2} GHz' -f ($cpu.MaxClockSpeed / 1000))
-        Update-DiagProgress $Ctx 10 'Mesure de la charge CPU (3 s)…'
+        Add-DiagItem $s (Get-Text 'Hw.006') ($cpu.Name.Trim())
+        Add-DiagItem $s (Get-Text 'Hw.007') ((Get-Text 'Hw.008') -f $cpu.NumberOfCores, $cpu.NumberOfLogicalProcessors)
+        Add-DiagItem $s (Get-Text 'Hw.009') ((Get-Text 'Hw.010') -f ($cpu.MaxClockSpeed / 1000))
+        Update-DiagProgress $Ctx 10 (Get-Text 'Hw.011')
         $load = Get-CpuLoadSample 3
         $st = if ($null -eq $load) { 'NA' } elseif ($load -ge 90) { 'Crit' } elseif ($load -ge 70) { 'Warn' } else { 'OK' }
-        Add-DiagItem $s 'Charge moyenne (3 s)' $(if ($null -ne $load) { "$load %" }) $st
+        Add-DiagItem $s (Get-Text 'Hw.012') $(if ($null -ne $load) { (Get-Text 'Hw.013' $load) }) $st
         $perf = Get-SafeCim Win32_PerfFormattedData_Counters_ProcessorInformation -Filter "Name='_Total'"
         if ($perf -and $null -ne $perf.PercentProcessorPerformance) {
             $pp = [int]$perf.PercentProcessorPerformance
-            Add-DiagItem $s 'Performance actuelle' ("$pp % de la fréquence de base") 'Info' 'Au-delà de 100 % = Turbo Boost actif. Une valeur très basse sous forte charge peut indiquer un bridage (thermique ou alimentation).'
+            Add-DiagItem $s (Get-Text 'Hw.015') ((Get-Text 'Hw.016' $pp)) 'Info' (Get-Text 'Hw.017')
         }
-        $vt = if ($cpu.VirtualizationFirmwareEnabled) { 'Activée' } else { 'Désactivée ou utilisée par Hyper-V' }
-        Add-DiagItem $s 'Virtualisation (BIOS)' $vt 'Info'
+        $vt = if ($cpu.VirtualizationFirmwareEnabled) { (Get-Text 'Hw.018') } else { (Get-Text 'Hw.019') }
+        Add-DiagItem $s (Get-Text 'Hw.020') $vt 'Info'
         $top = Get-Process -ErrorAction SilentlyContinue | Sort-Object CPU -Descending | Select-Object -First 8 |
             ForEach-Object { [pscustomobject]@{ Processus = $_.ProcessName; 'Temps CPU cumulé s' = [math]::Round($_.CPU, 0); 'Mémoire' = (Format-Bytes $_.WorkingSet64) } }
-        Add-DiagTable $s 'Processus les plus gourmands en CPU (depuis leur lancement)' $top
+        Add-DiagTable $s (Get-Text 'Hw.021') $top
     }
 
     # --- Mémoire -----------------------------------------------------------------
-    Update-DiagProgress $Ctx 30 'Lecture de la mémoire…'
-    Add-DiagSection $r 'Mémoire vive' -Body {
+    Update-DiagProgress $Ctx 30 (Get-Text 'Hw.022')
+    Add-DiagSection $r (Get-Text 'Hw.023') -Body {
         param($s)
         $os = Get-SafeCim Win32_OperatingSystem
         $mods = @(Get-SafeCim Win32_PhysicalMemory)
         $total = ($mods | Measure-Object Capacity -Sum).Sum
-        Add-DiagItem $s 'Capacité installée' ('{0} ({1} barrette(s))' -f (Format-Bytes $total), $mods.Count)
+        Add-DiagItem $s (Get-Text 'Hw.024') ((Get-Text 'Hw.025') -f (Format-Bytes $total), $mods.Count)
         $usedPct = [math]::Round((1 - $os.FreePhysicalMemory / $os.TotalVisibleMemorySize) * 100, 0)
         $st = if ($usedPct -ge 90) { 'Crit' } elseif ($usedPct -ge 80) { 'Warn' } else { 'OK' }
-        Add-DiagItem $s 'Utilisation actuelle' ('{0} % ({1} libres)' -f $usedPct, (Format-Bytes ($os.FreePhysicalMemory * 1KB))) $st
+        Add-DiagItem $s (Get-Text 'Hw.026') ((Get-Text 'Hw.027') -f $usedPct, (Format-Bytes ($os.FreePhysicalMemory * 1KB))) $st
         $commit = Get-SafeCim Win32_PerfFormattedData_PerfOS_Memory
-        if ($commit) { Add-DiagItem $s 'Mémoire engagée' ('{0} % de la limite' -f $commit.PercentCommittedBytesInUse) $(if ($commit.PercentCommittedBytesInUse -ge 85) { 'Warn' } else { 'OK' }) 'Inclut le fichier d''échange.' }
+        if ($commit) { Add-DiagItem $s (Get-Text 'Hw.028') ((Get-Text 'Hw.029') -f $commit.PercentCommittedBytesInUse) $(if ($commit.PercentCommittedBytesInUse -ge 85) { 'Warn' } else { 'OK' }) (Get-Text 'Hw.030') }
 
         $conf = ($mods | Measure-Object ConfiguredClockSpeed -Maximum).Maximum
         if ($conf) {
             $ddr = if (($mods | Select-Object -First 1).SMBIOSMemoryType -eq 34) { 'DDR5' } else { 'DDR4' }
             if ($ddr -eq 'DDR4' -and $conf -le 2666) {
-                Add-DiagItem $s 'Fréquence effective' "$conf MT/s" 'Warn' 'Fréquence JEDEC par défaut : le profil XMP semble désactivé. Il s''active dans le BIOS (à faire après une mise à jour du BIOS).'
-            } else { Add-DiagItem $s 'Fréquence effective' "$conf MT/s" 'OK' }
+                Add-DiagItem $s (Get-Text 'Hw.031') (Get-Text 'Hw.032' $conf) 'Warn' (Get-Text 'Hw.033')
+            } else { Add-DiagItem $s (Get-Text 'Hw.034') (Get-Text 'Hw.035' $conf) 'OK' }
         }
-        if ($mods.Count -eq 1) { Add-DiagItem $s 'Canaux' 'Une seule barrette : mode simple canal' 'Warn' 'Deux barrettes identiques (dual channel) offrent nettement plus de bande passante.' }
-        elseif ($mods.Count -ge 2) { Add-DiagItem $s 'Canaux' "$($mods.Count) barrettes : dual channel probable" 'OK' 'Vérifiez qu''elles sont dans les slots recommandés par le manuel de la carte mère (souvent A2/B2).' }
+        if ($mods.Count -eq 1) { Add-DiagItem $s (Get-Text 'Hw.036') (Get-Text 'Hw.037') 'Warn' (Get-Text 'Hw.038') }
+        elseif ($mods.Count -ge 2) { Add-DiagItem $s (Get-Text 'Hw.039') (Get-Text 'Hw.040' ($mods.Count)) 'OK' (Get-Text 'Hw.041') }
 
         $rows = $mods | ForEach-Object { [pscustomobject]@{ Emplacement = $_.DeviceLocator; Capacité = (Format-Bytes $_.Capacity); 'Vitesse max SPD' = $_.Speed; 'Vitesse configurée' = $_.ConfiguredClockSpeed; Fabricant = $_.Manufacturer; Référence = ("$($_.PartNumber)").Trim() } }
-        Add-DiagTable $s 'Barrettes' $rows
+        Add-DiagTable $s (Get-Text 'Hw.042') $rows
         $topMem = Get-Process -ErrorAction SilentlyContinue | Sort-Object WorkingSet64 -Descending | Select-Object -First 8 |
             ForEach-Object { [pscustomobject]@{ Processus = $_.ProcessName; Mémoire = (Format-Bytes $_.WorkingSet64) } }
-        Add-DiagTable $s 'Processus les plus gourmands en mémoire' $topMem
+        Add-DiagTable $s (Get-Text 'Hw.043') $topMem
     }
 
     # --- Carte graphique --------------------------------------------------------
-    Update-DiagProgress $Ctx 50 'Lecture de la carte graphique…'
-    Add-DiagSection $r 'Carte graphique' -Body {
+    Update-DiagProgress $Ctx 50 (Get-Text 'Hw.044')
+    Add-DiagSection $r (Get-Text 'Hw.045') -Body {
         param($s)
         $all = @(Get-SafeCim Win32_VideoController)
         foreach ($v in $all | Where-Object Name -match 'Parsec|Virtual|Basic Display|Remote') {
-            Add-DiagItem $s 'Adaptateur virtuel' $v.Name 'Info' 'Écran virtuel (bureau à distance, streaming) : pas une vraie carte graphique.'
+            Add-DiagItem $s (Get-Text 'Hw.047') $v.Name 'Info' (Get-Text 'Hw.048')
         }
         foreach ($g in $all | Where-Object Name -notmatch 'Parsec|Virtual|Basic Display|Remote') {
             $vram = Get-GpuVramBytes $g.Name
             if (-not $vram -and $g.AdapterRAM) { $vram = [double][uint32]$g.AdapterRAM }
             $date = if ($g.DriverDate) { $g.DriverDate.ToString('dd/MM/yyyy') } else { '' }
             $age = if ($g.DriverDate) { ((Get-Date) - $g.DriverDate).TotalDays } else { 0 }
-            Add-DiagItem $s $g.Name ('Pilote {0} du {1}' -f $g.DriverVersion, $date) $(if ($age -gt 365) { 'Warn' } else { 'OK' }) $(if ($age -gt 365) { 'Pilote de plus d''un an : une mise à jour depuis le site du fabricant (AMD, NVIDIA, Intel) est conseillée.' } else { '' })
-            if ($vram) { Add-DiagItem $s '  Mémoire vidéo' (Format-Bytes $vram) }
-            if ($g.CurrentHorizontalResolution) { Add-DiagItem $s '  Affichage principal' ('{0} × {1} à {2} Hz' -f $g.CurrentHorizontalResolution, $g.CurrentVerticalResolution, $g.CurrentRefreshRate) }
-            if ($g.Status -ne 'OK') { Add-DiagItem $s '  État du périphérique' $g.Status 'Crit' }
+            Add-DiagItem $s $g.Name ((Get-Text 'Hw.050') -f $g.DriverVersion, $date) $(if ($age -gt 365) { 'Warn' } else { 'OK' }) $(if ($age -gt 365) { (Get-Text 'Hw.051') } else { '' })
+            if ($vram) { Add-DiagItem $s (Get-Text 'Hw.052') (Format-Bytes $vram) }
+            if ($g.CurrentHorizontalResolution) { Add-DiagItem $s (Get-Text 'Hw.053') ((Get-Text 'Hw.054') -f $g.CurrentHorizontalResolution, $g.CurrentVerticalResolution, $g.CurrentRefreshRate) }
+            if ($g.Status -ne 'OK') { Add-DiagItem $s (Get-Text 'Hw.055') $g.Status 'Crit' }
         }
         # Charge GPU (compteurs Windows « GPU Engine », moteur 3D)
         $eng = @(Get-SafeCim Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine | Where-Object Name -match 'engtype_3D')
         if ($eng.Count) {
             $load = ($eng | Measure-Object UtilizationPercentage -Sum).Sum
-            Add-DiagItem $s 'Charge 3D instantanée' ('{0} %' -f [math]::Min(100, $load)) 'Info'
+            Add-DiagItem $s (Get-Text 'Hw.056') ('{0} %' -f [math]::Min(100, $load)) 'Info'
         }
         # Réinitialisations du pilote graphique (TDR) sur 30 jours
         try {
             $tdr = @(Get-WinEvent -FilterHashtable @{ LogName = 'System'; Id = 4101; StartTime = (Get-Date).AddDays(-30) } -ErrorAction Stop)
-            Add-DiagItem $s 'Plantages du pilote (TDR, 30 j)' $tdr.Count $(if ($tdr.Count -gt 0) { 'Warn' } else { 'OK' }) 'Événement 4101 : « le pilote d''affichage a cessé de répondre et a été récupéré ».'
-        } catch { Add-DiagItem $s 'Plantages du pilote (TDR, 30 j)' 0 'OK' }
+            Add-DiagItem $s (Get-Text 'Hw.058') $tdr.Count $(if ($tdr.Count -gt 0) { 'Warn' } else { 'OK' }) (Get-Text 'Hw.059')
+        } catch { Add-DiagItem $s (Get-Text 'Hw.060') 0 'OK' }
     }
 
     # --- Carte mère / BIOS ----------------------------------------------------
-    Update-DiagProgress $Ctx 65 'Lecture carte mère et BIOS…'
-    Add-DiagSection $r 'Carte mère et BIOS' -Body {
+    Update-DiagProgress $Ctx 65 (Get-Text 'Hw.061')
+    Add-DiagSection $r (Get-Text 'Hw.062') -Body {
         param($s)
         $bb = Get-SafeCim Win32_BaseBoard
         $bios = Get-SafeCim Win32_BIOS
-        Add-DiagItem $s 'Carte mère' ('{0} {1}' -f $bb.Manufacturer, $bb.Product)
+        Add-DiagItem $s (Get-Text 'Hw.063') ('{0} {1}' -f $bb.Manufacturer, $bb.Product)
         $bd = $bios.ReleaseDate
         $ageY = if ($bd) { [math]::Round(((Get-Date) - $bd).TotalDays / 365, 1) } else { $null }
         $st = if ($ageY -ge 2) { 'Warn' } else { 'OK' }
-        Add-DiagItem $s 'Version du BIOS' ('{0} du {1:dd/MM/yyyy}' -f $bios.SMBIOSBIOSVersion, $bd) $st $(if ($ageY -ge 2) { "BIOS de $ageY ans : le fabricant de la carte mère publie sans doute des correctifs de stabilité (microcode, mémoire). À mettre à jour en suivant sa procédure officielle." } else { '' })
+        Add-DiagItem $s (Get-Text 'Hw.064') ((Get-Text 'Hw.065') -f $bios.SMBIOSBIOSVersion, $bd) $st $(if ($ageY -ge 2) { (Get-Text 'Hw.066' $ageY) } else { '' })
         try {
             $plan = (powercfg /getactivescheme) -replace '^.*\((.*)\)\s*$', '$1'
-            Add-DiagItem $s 'Mode d''alimentation actif' $plan 'Info'
+            Add-DiagItem $s (Get-Text 'Hw.067') $plan 'Info'
         } catch { }
         $sb = try { Confirm-SecureBootUEFI -ErrorAction Stop } catch { $null }
-        Add-DiagItem $s 'Secure Boot' $(if ($null -eq $sb) { $null } elseif ($sb) { 'Activé' } else { 'Désactivé' }) 'Info' $(if ($null -eq $sb) { 'Lecture nécessitant les droits administrateur.' } else { '' })
+        Add-DiagItem $s (Get-Text 'Hw.068') $(if ($null -eq $sb) { $null } elseif ($sb) { (Get-Text 'Hw.069') } else { (Get-Text 'Hw.070') }) 'Info' $(if ($null -eq $sb) { (Get-Text 'Hw.071') } else { '' })
     }
 
     # --- Températures ---------------------------------------------------------
-    Update-DiagProgress $Ctx 80 'Recherche des capteurs de température…'
-    Add-DiagSection $r 'Températures' -Body {
+    Update-DiagProgress $Ctx 80 (Get-Text 'Hw.072')
+    Add-DiagSection $r (Get-Text 'Hw.073') -Body {
         param($s)
         $found = $false
         $cpuShort = ((Get-SafeCim Win32_Processor | Select-Object -First 1).Name -replace '\(R\)|\(TM\)|CPU|@.*$|\d+th Gen\s*', '' -replace '\s+', ' ').Trim()
@@ -151,9 +151,9 @@ function Invoke-HardwareDiagnostic {
             if ($sens.Count) {
                 $found = $true
                 $rows = $sens | Sort-Object Parent, Name | ForEach-Object { [pscustomobject]@{ Capteur = $_.Name; Composant = $_.Parent; 'Valeur °C' = [math]::Round($_.Value, 1); 'Max °C' = [math]::Round($_.Max, 1) } }
-                Add-DiagTable $s "Capteurs fournis par $($ns.Split('/')[1])" $rows
+                Add-DiagTable $s (Get-Text 'Hw.077' ($ns.Split('/')[1])) $rows
                 $cpuT = $sens | Where-Object { $_.Parent -match 'cpu' -and $_.Name -match 'Package' } | Select-Object -First 1
-                if ($cpuT) { Add-DiagItem $s 'CPU (package)' ('{0:N0} °C' -f $cpuT.Value) $(if ($cpuT.Value -ge 90) { 'Crit' } elseif ($cpuT.Value -ge 80) { 'Warn' } else { 'OK' }) }
+                if ($cpuT) { Add-DiagItem $s (Get-Text 'Hw.078') ('{0:N0} °C' -f $cpuT.Value) $(if ($cpuT.Value -ge 90) { 'Crit' } elseif ($cpuT.Value -ge 80) { 'Warn' } else { 'OK' }) }
             }
         }
 
@@ -164,7 +164,7 @@ function Invoke-HardwareDiagnostic {
             if ($k -gt 200) {
                 $found = $true
                 $c = [math]::Round($k - 273.15, 1)
-                Add-DiagItem $s ("Zone ACPI {0}" -f ($z.Name -replace '^.*\\', '')) "$c °C" $(if ($c -ge 90) { 'Warn' } else { 'Info' }) 'Capteur de la carte mère exposé par l''ACPI : ce n''est pas la température exacte des cœurs du CPU.'
+                Add-DiagItem $s ((Get-Text 'Hw.079') -f ($z.Name -replace '^.*\\', '')) "$c °C" $(if ($c -ge 90) { 'Warn' } else { 'Info' }) (Get-Text 'Hw.080')
             }
         }
 
@@ -173,19 +173,19 @@ function Invoke-HardwareDiagnostic {
             $rc = try { $d | Get-StorageReliabilityCounter -ErrorAction Stop } catch { $null }
             if ($rc -and $rc.Temperature) {
                 $found = $true
-                Add-DiagItem $s ("Disque : {0}" -f $d.FriendlyName) ('{0} °C' -f $rc.Temperature) $(if ($rc.Temperature -ge 70) { 'Crit' } elseif ($rc.Temperature -ge 60) { 'Warn' } else { 'OK' })
+                Add-DiagItem $s ((Get-Text 'Hw.081') -f $d.FriendlyName) ('{0} °C' -f $rc.Temperature) $(if ($rc.Temperature -ge 70) { 'Crit' } elseif ($rc.Temperature -ge 60) { 'Warn' } else { 'OK' })
             }
         }
 
-        if (-not ($s.Items | Where-Object Label -eq 'CPU (package)')) {
-            Add-DiagItem $s ('Température des cœurs CPU (' + $cpuShort + ')') $null 'NA' 'Windows n''expose pas les capteurs internes du processeur sans pilote tiers. Aucune valeur n''est estimée.'
+        if (-not ($s.Items | Where-Object Label -eq (Get-Text 'Hw.082'))) {
+            Add-DiagItem $s ((Get-Text 'Hw.083') + $cpuShort + ')') $null 'NA' (Get-Text 'Hw.084')
         }
-        Add-DiagItem $s ('Température GPU (' + $gpuShort + ')') $null 'NA' 'Non exposée par Windows. Consultable dans le logiciel du pilote (AMD Adrenalin, NVIDIA App…) ou le Gestionnaire des tâches > Performances.'
-        if (-not (Test-IsAdmin)) { Add-DiagNote $s 'Mode standard : la température des disques nécessite les droits administrateur.' }
-        Add-DiagNote $s 'Astuce : si LibreHardwareMonitor est lancé (en administrateur), ses capteurs apparaissent automatiquement ici. Rien n''est installé par PC Toolkit.'
+        Add-DiagItem $s ((Get-Text 'Hw.085') + $gpuShort + ')') $null 'NA' (Get-Text 'Hw.086')
+        if (-not (Test-IsAdmin)) { Add-DiagNote $s (Get-Text 'Hw.087') }
+        Add-DiagNote $s (Get-Text 'Hw.088')
     }
 
-    Update-DiagProgress $Ctx 100 'Terminé'
+    Update-DiagProgress $Ctx 100 (Get-Text 'Hw.089')
     $r
 }
 
