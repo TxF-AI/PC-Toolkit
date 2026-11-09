@@ -240,3 +240,119 @@ Describe 'Distribution : zip, installation, désinstallation' {
         (Get-ChildItem -LiteralPath $lnkDir -Filter '*.lnk').Name | Should Be 'autre.lnk'
     }
 }
+
+Describe 'Demarrage et Mode Performance' {
+    It 'Octets StartupApproved : active = pair, desactive = impair avec date' {
+        $on = Get-StartupApprovedBytes -Enabled $true
+        $off = Get-StartupApprovedBytes -Enabled $false
+        $on.Count | Should Be 12
+        Test-StartupApprovedEnabled $on | Should Be $true
+        Test-StartupApprovedEnabled $off | Should Be $false
+        ([BitConverter]::ToInt64($off, 4)) -gt 0 | Should Be $true
+    }
+    It 'Valeur absente ou octet 6 = active, octet 3 ou 7 = desactive' {
+        Test-StartupApprovedEnabled $null | Should Be $true
+        Test-StartupApprovedEnabled ([byte[]](6, 0, 0, 0)) | Should Be $true
+        Test-StartupApprovedEnabled ([byte[]](3, 0, 0, 0)) | Should Be $false
+        Test-StartupApprovedEnabled ([byte[]](7, 0, 0, 0)) | Should Be $false
+    }
+    It 'Get-CommandExecutable gere guillemets, arguments et espaces' {
+        Get-CommandExecutable '"C:\Program Files\App\app.exe" --minimized' | Should Be 'C:\Program Files\App\app.exe'
+        Get-CommandExecutable 'C:\Program Files\App\app.exe /s' | Should Be 'C:\Program Files\App\app.exe'
+        Get-CommandExecutable 'C:\Tools\run.exe' | Should Be 'C:\Tools\run.exe'
+        Get-CommandExecutable '' | Should Be ''
+    }
+    It 'Get-StartupItems est en lecture seule et renvoie des champs complets' {
+        $before = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue | Out-String)
+        $e = @(Get-StartupItems)
+        (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -ErrorAction SilentlyContinue | Out-String) | Should Be $before
+        foreach ($x in $e) { [string]::IsNullOrEmpty([string]$x.Name) | Should Be $false; [string]::IsNullOrEmpty([string]$x.Source) | Should Be $false; ($x.Enabled -is [bool]) | Should Be $true }
+    }
+    It 'Set-StartupEntryState exige -Confirmed' {
+        $en = [pscustomobject]@{ Name = 'x'; Scope = 'User'; ApprovedKey = 'HKCU:\Software\PCToolkitTest\A'; ValueName = 'x'; Source = 't' }
+        { Set-StartupEntryState -Entry $en -Enabled $false } | Should Throw
+    }
+    It 'Desactiver puis reactiver ne touche que StartupApproved' {
+        $key = 'HKCU:\Software\PCToolkitTest\Approved'
+        try {
+            $en = [pscustomobject]@{ Name = 'Test'; Scope = 'User'; ApprovedKey = $key; ValueName = 'Test'; Source = 'test' }
+            Set-StartupEntryState -Entry $en -Enabled $false -Confirmed | Out-Null
+            Test-StartupApprovedEnabled (Get-ItemProperty $key).Test | Should Be $false
+            Set-StartupEntryState -Entry $en -Enabled $true -Confirmed | Out-Null
+            Test-StartupApprovedEnabled (Get-ItemProperty $key).Test | Should Be $true
+        } finally { Remove-Item 'HKCU:\Software\PCToolkitTest' -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+    It 'Un programme systeme est refuse sans droits administrateur' {
+        if (Test-IsAdmin) { Set-TestInconclusive 'session administrateur'; return }
+        $en = [pscustomobject]@{ Name = 'M'; Scope = 'Machine'; ApprovedKey = 'HKCU:\Software\PCToolkitTest\M'; ValueName = 'M'; Source = 't' }
+        { Set-StartupEntryState -Entry $en -Enabled $false -Confirmed } | Should Throw
+        Test-Path 'HKCU:\Software\PCToolkitTest' | Should Be $false
+    }
+    It 'Liste des services du mode : les 7 services prevus' {
+        $n = @(Get-GameModeServiceList | ForEach-Object Name)
+        foreach ($s in 'Spooler', 'SysMain', 'wuauserv', 'DiagTrack', 'MapsBroker', 'Fax', 'RemoteRegistry') { $n -contains $s | Should Be $true }
+        $n.Count | Should Be 7
+    }
+    It 'Get-GameModeStatus est en lecture seule (pas de fichier d''etat cree)' {
+        $p = Join-Path $TestDrive 'etat.json'
+        $s = Get-GameModeStatus -StatePath $p
+        $s.ModeActive | Should Be $false
+        $s.Services.Count | Should Be 7
+        Test-Path $p | Should Be $false
+    }
+    It 'Enable-GameMode et Restore-GameMode exigent -Confirmed' {
+        { Enable-GameMode } | Should Throw
+        { Restore-GameMode } | Should Throw
+        { Invoke-RamTrim } | Should Throw
+    }
+    It 'Enable-GameMode sans droits administrateur ne modifie rien' {
+        if (Test-IsAdmin) { Set-TestInconclusive 'session administrateur'; return }
+        $p = Join-Path $TestDrive 'etat2.json'
+        { Enable-GameMode -Confirmed -StatePath $p } | Should Throw
+        Test-Path $p | Should Be $false
+    }
+    It 'Restore-GameMode sans etat sauvegarde refuse' {
+        { Restore-GameMode -Confirmed -StatePath (Join-Path $TestDrive 'absent.json') } | Should Throw
+    }
+    It 'Restore-GameMode avec un etat vide supprime le fichier d''etat' {
+        $p = Join-Path $TestDrive 'etat3.json'
+        Write-GameModeState -Path $p -State ([ordered]@{ Date = 'x'; PreviousPlanGuid = $null; PreviousPlanName = $null; CreatedPlanGuid = $null; ServicesToStop = @(); ServicesStopped = @() })
+        (Get-GameModeStatus -StatePath $p).ModeActive | Should Be $true
+        $r = Restore-GameMode -Confirmed -StatePath $p
+        $r.Started.Count | Should Be 0
+        Test-Path $p | Should Be $false
+    }
+    It 'Etat sauvegarde : aller-retour JSON sans perte' {
+        $p = Join-Path $TestDrive 'etat4.json'
+        Write-GameModeState -Path $p -State ([ordered]@{ Date = 'd'; PreviousPlanGuid = 'g'; PreviousPlanName = 'Équilibré'; ServicesStopped = @('Spooler', 'SysMain') })
+        $s = Read-GameModeState -Path $p
+        $s.PreviousPlanName | Should Be 'Équilibré'
+        @($s.ServicesStopped).Count | Should Be 2
+    }
+    It 'Les gains du Mode Performance apparaissent dans le bilan (services coupes, RAM)' {
+        $b = [pscustomobject]@{ Date = '2026-01-01 10:00:00'; IsAdmin = $true; DiskFreeBytes = 1GB; RamUsedPct = 60.0; RamUsedMB = 9600; RamFreeMB = 6400; ServicesRunning = 120; Processes = 200; AudioGhost = 0; CacheBytes = 0 }
+        $a = [pscustomobject]@{ Date = '2026-01-01 10:01:00'; IsAdmin = $true; DiskFreeBytes = 1GB; RamUsedPct = 55.0; RamUsedMB = 8800; RamFreeMB = 7200; ServicesRunning = 114; Processes = 198; AudioGhost = 0; CacheBytes = 0 }
+        $rows = @(Get-SnapshotComparison -Before $b -After $a)
+        ($rows | Where-Object Indicateur -eq 'Services actifs').Gain | Should Match '6 services coupés'
+        ($rows | Where-Object Indicateur -eq 'RAM disponible').Status | Should Be 'OK'
+    }
+    It 'Garde-fou : l''interface branche les pages et le bilan' {
+        $src = Get-Content -LiteralPath (Join-Path $Root 'PCToolkit.ps1') -Raw -Encoding UTF8
+        $src | Should Match "'Startup' \{ Show-StartupPage \}"
+        $src | Should Match "'Perf' \{ Show-PerfPage \}"
+        $src | Should Match "Start-BilanCapture 'mode performance' -Force"
+        $src | Should Match 'Enable-GameMode -Confirmed'
+        $src | Should Match 'Restore-GameMode -Confirmed'
+        $src | Should Match 'Set-StartupEntryState -Entry \$Entry -Enabled \$enable -Confirmed'
+    }
+}
+
+Describe 'Modules : pas de fonction en double' {
+    It 'Aucun nom de fonction n''est defini dans deux modules (le dernier importe ecraserait l''autre)' {
+        $names = Get-ChildItem -LiteralPath (Join-Path $Root 'Modules') -Filter '*.psm1' | ForEach-Object {
+            Select-String -LiteralPath $_.FullName -Pattern '^function\s+([\w-]+)' | ForEach-Object { $_.Matches[0].Groups[1].Value }
+        }
+        $dups = @($names | Group-Object | Where-Object Count -gt 1 | ForEach-Object Name)
+        ($dups -join ', ') | Should Be ''
+    }
+}

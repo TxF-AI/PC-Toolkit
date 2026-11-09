@@ -85,7 +85,9 @@ $script:Pages = [ordered]@{
     Storage     = @{ Nav = 'NavStorage';     Title = 'Stockage';        Fn = 'Invoke-StorageDiagnostic';   Desc = 'Espace libre, santé des disques, dossiers volumineux et recherche de gros fichiers. Rien n''est supprimé.'; Opt = 'OptStorage' }
     Audio       = @{ Nav = 'NavAudio';       Title = 'Audio';           Fn = 'Invoke-AudioDiagnostic';     Desc = 'Votre sortie et votre micro par défaut (carte son, USB, Bluetooth, HDMI…) : connexion, pilote, fréquences d''échantillonnage, ASIO, latence indicative.' }
     Maintenance = @{ Nav = 'NavMaintenance'; Title = 'Maintenance';     Custom = $true;                    Desc = 'Vérifications et nettoyage contrôlé. Chaque action qui modifie le système demande votre confirmation.' }
-    Bilan       = @{ Nav = 'NavBilan';       Title = 'Bilan avant/après'; Custom = $true;                  Desc = 'Chaque nettoyage lancé depuis Maintenance est mesuré automatiquement : espace libéré, RAM, services actifs, fichiers temporaires et périphériques audio fantômes.' }
+    Startup     = @{ Nav = 'NavStartup';     Title = 'Démarrage';       Custom = $true;                    Desc = 'Programmes lancés avec Windows. Désactiver n''en supprime aucun : vous pouvez les réactiver à tout moment.' }
+    Perf        = @{ Nav = 'NavPerf';        Title = 'Mode Performance'; Custom = $true;                   Desc = 'Plan d''alimentation haute performance et arrêt temporaire de services secondaires pour jouer ou faire de la MAO. Tout se remet en un clic.' }
+    Bilan       = @{ Nav = 'NavBilan';       Title = 'Bilan avant/après'; Custom = $true;                  Desc = 'Chaque nettoyage lancé depuis Maintenance, et chaque activation du Mode Performance, est mesuré automatiquement : espace libéré, RAM, services actifs, fichiers temporaires et périphériques audio fantômes.' }
     History     = @{ Nav = 'NavHistory';    Title = 'Historique';      Custom = $true;                    Desc = 'Diagnostics précédents : réouverture, comparaison et export HTML.' }
 }
 $script:CurrentPage = 'Dashboard'
@@ -330,10 +332,12 @@ function Set-Page([string]$Page) {
     $UI.BtnBack.Visibility = 'Collapsed'
     foreach ($o in 'OptNetwork', 'OptWindows', 'OptStorage') { $UI[$o].Visibility = if ($p.Opt -eq $o) { 'Visible' } else { 'Collapsed' } }
     $UI.BtnRun.Visibility = if ($p.Custom) { 'Collapsed' } else { 'Visible' }
-    $UI.BtnExport.Visibility = if ($Page -eq 'Maintenance') { 'Collapsed' } else { 'Visible' }
+    $UI.BtnExport.Visibility = if ($Page -in 'Maintenance', 'Startup', 'Perf') { 'Collapsed' } else { 'Visible' }
 
     switch ($Page) {
         'Maintenance' { Show-MaintenancePage }
+        'Startup' { Show-StartupPage }
+        'Perf' { Show-PerfPage }
         'Bilan' { Show-BilanPage }
         'History' { Show-HistoryPage }
         default {
@@ -543,6 +547,183 @@ function Show-MaintenancePage {
         }
         [void]$UI.ResultsPanel.Children.Add($wp)
     }
+}
+
+#endregion
+
+#region Pages Démarrage et Mode Performance ---------------------------------------------------
+
+$script:StartupMap = @{}   # index de ligne -> entrée de démarrage
+
+function New-ActionButton([string]$Text, [string]$Style, [string]$AutoId, [scriptblock]$OnClick, [bool]$Enabled = $true, [switch]$NoBusyLock) {
+    $btn = New-Object Windows.Controls.Button
+    $btn.Style = $Window.FindResource($Style)
+    $btn.Content = $Text; $btn.Margin = '0,0,10,6'
+    $btn.IsEnabled = $Enabled -and -not $script:Job
+    [Windows.Automation.AutomationProperties]::SetAutomationId($btn, $AutoId)
+    $btn.Add_Click($OnClick)
+    if (-not $NoBusyLock -and $Enabled) { [void]$script:BusyDisable.Add($btn) }
+    $btn
+}
+
+function Switch-StartupEntry($Entry) {
+    $enable = -not $Entry.Enabled
+    $msg = if ($enable) { "Réactiver « $($Entry.Name) » au démarrage de Windows ?`n`nSource : $($Entry.Source)`n$($Entry.Command)" }
+           else { "Désactiver « $($Entry.Name) » au démarrage de Windows ?`n`nSource : $($Entry.Source)`n$($Entry.Command)`n`nRien n'est supprimé : le programme ne se lancera simplement plus tout seul, et vous pourrez le réactiver ici ou dans le Gestionnaire des tâches." }
+    if (-not (Confirm-Action $msg $(if ($enable) { 'Réactiver' } else { 'Désactiver' }))) { return }
+    try { [void](Set-StartupEntryState -Entry $Entry -Enabled $enable -Confirmed) }
+    catch { Show-Message $_.Exception.Message 'Démarrage' 'Warning'; return }
+    Show-StartupPage
+}
+
+function Show-StartupPage {
+    $UI.ResultsPanel.Children.Clear()
+    $script:BusyDisable.Clear()
+    $script:StartupMap = @{}
+    $isAdmin = [bool](Test-IsAdmin)
+    $entries = @()
+    try { $entries = @(Get-StartupItems) } catch { Write-AppLog "Démarrage : $($_.Exception.Message)" 'ERROR' }
+
+    $card = New-Card 12
+    $sp = New-Object Windows.Controls.StackPanel
+    $on = @($entries | Where-Object Enabled).Count
+    $h = New-Text 'PROGRAMMES AU DÉMARRAGE' 12 '#FF8A95' 'SemiBold'; $h.FontFamily = 'Bahnschrift SemiBold, Segoe UI Semibold'
+    [void]$sp.Children.Add($h)
+    $t = New-Text ("{0} programme(s) : {1} activé(s), {2} désactivé(s). Sources : clés Run (utilisateur et système) et dossiers Démarrage." -f $entries.Count, $on, ($entries.Count - $on)) 12.5 '#C9B8BC' -Wrap
+    $t.Margin = '0,6,0,6'; [void]$sp.Children.Add($t)
+    if (-not $isAdmin) {
+        $w = New-Text 'Les programmes « système » (tous les utilisateurs) ne peuvent être modifiés qu''en administrateur : leur bouton est grisé.' 12 '#FFB020' -Wrap
+        $w.Margin = '0,0,0,6'; [void]$sp.Children.Add($w)
+    }
+    [void]$sp.Children.Add((New-ActionButton 'Actualiser' 'GhostButton' 'Startup_refresh' { param($s, $e) Show-StartupPage }))
+    $card.Child = $sp
+    [void]$UI.ResultsPanel.Children.Add($card)
+
+    $i = 0
+    foreach ($en in $entries) {
+        $script:StartupMap[$i] = $en
+        $row = New-Card 8
+        $row.Padding = '14,10,14,10'
+        $dock = New-Object Windows.Controls.DockPanel
+        $canEdit = ($en.Scope -eq 'User') -or $isAdmin
+        $btn = New-ActionButton $(if ($en.Enabled) { 'Désactiver' } else { 'Réactiver' }) $(if ($en.Enabled) { 'AccentButton' } else { 'GhostButton' }) "Startup_$i" {
+            param($s, $e) Switch-StartupEntry $script:StartupMap[[int]$s.Tag]
+        } $canEdit -NoBusyLock:(-not $canEdit)
+        $btn.Tag = $i; $btn.Margin = '12,0,0,0'; $btn.VerticalAlignment = 'Center'
+        [Windows.Controls.DockPanel]::SetDock($btn, 'Right')
+        [void]$dock.Children.Add($btn)
+        $left = New-Object Windows.Controls.StackPanel
+        $line = New-Object Windows.Controls.WrapPanel
+        $nm = New-Text $en.Name 14 '#FFFFFF' 'SemiBold'; $nm.Margin = '0,0,10,0'
+        [void]$line.Children.Add($nm)
+        $b = New-Badge $(if ($en.Enabled) { 'OK' } else { 'NA' }); $b.Child.Text = $(if ($en.Enabled) { 'Activé' } else { 'Désactivé' }); $b.Margin = '0,1,6,0'; [void]$line.Children.Add($b)
+        $b = New-Badge 'Info'; $b.Child.Text = $en.Source; $b.Margin = '0,1,6,0'; [void]$line.Children.Add($b)
+        if ($en.Missing) { $b = New-Badge 'Warn'; $b.Child.Text = 'Fichier introuvable'; $b.Margin = '0,1,6,0'; [void]$line.Children.Add($b) }
+        if ($en.Scope -eq 'Machine' -and -not $isAdmin) { $b = New-Badge 'Warn'; $b.Child.Text = 'Admin requis'; $b.Margin = '0,1,6,0'; [void]$line.Children.Add($b) }
+        [void]$left.Children.Add($line)
+        $p = New-Text $(if ($en.Path) { $en.Path } else { $en.Command }) 11.5 '#A8969B' -Wrap; $p.Margin = '0,4,0,0'
+        [void]$left.Children.Add($p)
+        [void]$dock.Children.Add($left)
+        $row.Child = $dock
+        [void]$UI.ResultsPanel.Children.Add($row)
+        $i++
+    }
+    if ($entries.Count -eq 0) { [void]$UI.ResultsPanel.Children.Add((New-Text 'Aucun programme de démarrage trouvé dans ces emplacements.' 13 '#A8969B')) }
+}
+
+function Invoke-PerfEnable {
+    $st = Get-GameModeStatus
+    if ($st.ModeActive) { Show-Message 'Le Mode Performance est déjà actif. Utilisez « Restaurer l''état initial ».' 'Mode Performance'; return }
+    if (-not $st.IsAdmin) { Show-Message "Le Mode Performance arrête des services Windows : il demande les droits administrateur.`n`nRelancez PC Toolkit avec le bouton « Relancer en administrateur » en bas de la barre latérale." 'Mode Performance' 'Warning'; return }
+    $run = @($st.Services | Where-Object Running)
+    $list = if ($run.Count) { ($run | ForEach-Object { " • $($_.Name) : $($_.Why)" }) -join "`n" } else { ' (aucun : ils sont déjà arrêtés)' }
+    $msg = "Activer le Mode Performance ?`n`n1. Plan d'alimentation actuel (« $($st.ActivePlan) ») sauvegardé, puis passage en Performances ultimes / élevées.`n2. Arrêt temporaire de $($run.Count) service(s) :`n$list`n`nRien n'est supprimé ni désactivé définitivement : « Restaurer l'état initial » remet le plan et relance les services (l'état est gardé dans Data\GameMode.json, même si vous fermez l'application).`n`nContinuer ?"
+    if (-not (Confirm-Action $msg 'Mode Performance')) { return }
+    $flush = (Show-Message "Vider aussi le cache de la mémoire RAM ?`n`nLes pages mémoire inactives des programmes ouverts sont libérées (aucun programme n'est fermé). L'effet est temporaire : Windows les recharge au besoin." 'Mode Performance — RAM' 'Question' 'YesNo') -eq 'Yes'
+    Start-BilanCapture 'mode performance' -Force
+    $old = $Window.Cursor
+    try {
+        $Window.Cursor = [Windows.Input.Cursors]::Wait
+        $r = Enable-GameMode -Confirmed -FlushRam:$flush
+    } catch {
+        Write-AppLog "Mode Performance : $($_.Exception.Message)" 'ERROR'
+        Show-Message $_.Exception.Message 'Mode Performance' 'Warning'
+        if ($script:CurrentPage -eq 'Perf') { Show-PerfPage }
+        return
+    } finally { $Window.Cursor = $old }
+    $lines = @("Plan : {0} → {1}" -f $r.PlanBefore, $(if ($r.PlanAfter) { $r.PlanAfter } else { 'inchangé' }))
+    if ($r.PlanNote) { $lines += $r.PlanNote }
+    $lines += "Services arrêtés ({0}) : {1}" -f $r.Stopped.Count, $(if ($r.Stopped.Count) { $r.Stopped -join ', ' } else { 'aucun' })
+    if ($r.Failed.Count) { $lines += "Non arrêtés : " + ($r.Failed -join ', ') }
+    if ($r.Ram) { $lines += "RAM : {0} processus allégés ({1} Mo gagnés)" -f $r.Ram.Processes, $(if ($null -ne $r.Ram.FreedMB) { $r.Ram.FreedMB } else { 'mesure indisponible' }) }
+    Show-Message (($lines -join "`n") + "`n`nLe bilan avant/après va s'afficher.") 'Mode Performance activé'
+    Complete-Bilan
+    if ($script:CurrentPage -eq 'Perf') { Show-PerfPage }
+}
+
+function Invoke-PerfRestore {
+    $st = Get-GameModeStatus
+    if (-not $st.ModeActive) { Show-Message 'Le Mode Performance n''est pas actif : rien à restaurer.' 'Mode Performance'; return }
+    $n = @($st.State.ServicesStopped).Count
+    if (-not (Confirm-Action "Restaurer l'état initial ?`n`n • plan d'alimentation : « $($st.State.PreviousPlanName) »`n • $n service(s) à relancer : $(@($st.State.ServicesStopped) -join ', ')" 'Restaurer')) { return }
+    $old = $Window.Cursor
+    try {
+        $Window.Cursor = [Windows.Input.Cursors]::Wait
+        $r = Restore-GameMode -Confirmed
+    } catch {
+        Write-AppLog "Mode Performance (restauration) : $($_.Exception.Message)" 'ERROR'
+        Show-Message $_.Exception.Message 'Mode Performance' 'Warning'
+        return
+    } finally { $Window.Cursor = $old }
+    $lines = @("Plan : {0}" -f $(if ($r.PlanRestored) { "« $($r.PlanRestored) » rétabli" } else { 'inchangé' }))
+    if ($r.PlanNote) { $lines += $r.PlanNote }
+    $lines += "Services relancés ({0}) : {1}" -f $r.Started.Count, $(if ($r.Started.Count) { $r.Started -join ', ' } else { 'aucun' })
+    if ($r.Failed.Count) { $lines += "Non relancés (réessayez) : " + ($r.Failed -join ', ') }
+    Show-Message ($lines -join "`n") 'État initial restauré'
+    Show-PerfPage
+}
+
+function Show-PerfPage {
+    $UI.ResultsPanel.Children.Clear()
+    $script:BusyDisable.Clear()
+    $st = $null
+    try { $st = Get-GameModeStatus } catch { Write-AppLog "Mode Performance : $($_.Exception.Message)" 'ERROR' }
+    if (-not $st) { [void]$UI.ResultsPanel.Children.Add((New-Text 'État du Mode Performance indisponible.' 13 '#A8969B')); return }
+
+    $card = New-Card 12
+    $sp = New-Object Windows.Controls.StackPanel
+    $h = New-Text 'ÉTAT' 12 '#FF8A95' 'SemiBold'; $h.FontFamily = 'Bahnschrift SemiBold, Segoe UI Semibold'
+    [void]$sp.Children.Add($h)
+    $mode = if ($st.ModeActive) { "Mode Performance ACTIF depuis le $($st.State.Date)." } else { 'Mode Performance inactif.' }
+    $t = New-Text $mode 14 $(if ($st.ModeActive) { '#3DDC84' } else { '#FFFFFF' }) 'SemiBold'; $t.Margin = '0,6,0,4'; [void]$sp.Children.Add($t)
+    $t = New-Text ("Plan d'alimentation actuel : {0}" -f $(if ($st.ActivePlan) { $st.ActivePlan } else { 'Non disponible' })) 12.5 '#C9B8BC'; [void]$sp.Children.Add($t)
+    if (-not $st.IsAdmin) {
+        $w = New-Text 'Droits administrateur requis pour activer ou restaurer (arrêt et relance de services). Utilisez « Relancer en administrateur » dans la barre latérale.' 12 '#FFB020' -Wrap
+        $w.Margin = '0,6,0,0'; [void]$sp.Children.Add($w)
+    }
+    $wp = New-Object Windows.Controls.WrapPanel; $wp.Margin = '0,10,0,0'
+    [void]$wp.Children.Add((New-ActionButton 'Activer le Mode Performance…' 'AccentButton' 'Perf_enable' { param($s, $e) Invoke-PerfEnable } (-not $st.ModeActive)))
+    [void]$wp.Children.Add((New-ActionButton 'Restaurer l''état initial…' 'GhostButton' 'Perf_restore' { param($s, $e) Invoke-PerfRestore } $st.ModeActive))
+    [void]$sp.Children.Add($wp)
+    $card.Child = $sp
+    [void]$UI.ResultsPanel.Children.Add($card)
+
+    $card = New-Card 12
+    $sp = New-Object Windows.Controls.StackPanel
+    $h = New-Text 'SERVICES ARRÊTÉS PAR LE MODE' 12 '#FF8A95' 'SemiBold'; $h.FontFamily = 'Bahnschrift SemiBold, Segoe UI Semibold'; $h.Margin = '0,0,0,8'
+    [void]$sp.Children.Add($h)
+    foreach ($s in $st.Services) {
+        $line = New-Object Windows.Controls.WrapPanel; $line.Margin = '0,0,0,6'
+        $n = New-Text $s.Name 13 '#FFFFFF' 'SemiBold'; $n.Width = 130; [void]$line.Children.Add($n)
+        $b = New-Badge $(if ($s.Running) { 'Warn' } else { 'NA' }); $b.Child.Text = $(if ($s.Running) { 'En cours' } elseif ($s.Exists) { 'Arrêté' } else { 'Absent' }); $b.Width = 70; $b.Margin = '0,0,10,0'
+        [void]$line.Children.Add($b)
+        [void]$line.Children.Add((New-Text $s.Why 12 '#A8969B'))
+        [void]$sp.Children.Add($line)
+    }
+    $n = New-Text 'Seuls les services « En cours » sont arrêtés ; le type de démarrage n''est jamais modifié. Au prochain redémarrage de Windows, tout redevient normal de toute façon.' 11.5 '#9C8A8E' -Wrap
+    $n.Margin = '0,6,0,0'; [void]$sp.Children.Add($n)
+    $card.Child = $sp
+    [void]$UI.ResultsPanel.Children.Add($card)
 }
 
 #endregion

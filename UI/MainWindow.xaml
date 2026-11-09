@@ -313,6 +313,8 @@
                     <RadioButton x:Name="NavAudio"     GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE8D6;" Content="Audio"/>
                     <TextBlock Text="OUTILS" Foreground="#6E5C61" FontSize="10.5" FontWeight="SemiBold" Margin="10,18,0,6"/>
                     <RadioButton x:Name="NavMaintenance" GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE90F;" Content="Maintenance"/>
+                    <RadioButton x:Name="NavStartup"     GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE7E8;" Content="Démarrage"/>
+                    <RadioButton x:Name="NavPerf"        GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE7FC;" Content="Mode Performance"/>
                     <RadioButton x:Name="NavBilan"       GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE9D9;" Content="Bilan avant/après"/>
                     <RadioButton x:Name="NavHistory"    GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE81C;" Content="Historique"/>
                 </StackPanel>

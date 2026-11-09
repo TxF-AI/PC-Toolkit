@@ -43,6 +43,8 @@ Les deux suites de chiffres et de lettres doivent être identiques. Sinon, le fi
 | Audio | Votre sortie et votre micro **par défaut**, quels qu'ils soient : carte son intégrée (Realtek…), DAC ou interface USB, casque Bluetooth, HDMI, GoXLR, périphérique virtuel. Type de connexion, pilote, fréquences, ASIO, suspension USB, latence indicative |
 | Maintenance | Fichiers temporaires, corbeille, cache DNS, SFC, DISM, CHKDSK, point de restauration |
 | Historique et confidentialité | Fichiers récents et listes de raccourcis, téléchargements inachevés, remise à zéro des compteurs de données réseau (SRUM) |
+| Démarrage | Programmes lancés avec Windows (clés Run, dossiers Démarrage) : activation / désactivation en un clic, rien n'est supprimé |
+| Mode Performance | Plan haute performance + arrêt temporaire de services secondaires, restauration en un clic (administrateur requis) |
 | Bilan avant/après | Mesure de départ au début du diagnostic, tableau comparatif à la fin des nettoyages (espace libéré, RAM, services, processus, fichiers temporaires, périphériques audio fantômes). En mémoire ; ajouté à la fin des exports HTML et TXT |
 | Historique | Diagnostics enregistrés, export en rapport HTML ou TXT |
 

@@ -1,5 +1,16 @@
 # Nouveautés
 
+## 1.3.0
+
+**Démarrage**
+- Nouvelle page « Démarrage » : programmes lancés avec Windows (clés Run utilisateur et système, dossiers Démarrage) avec nom, chemin, source et statut Activé / Désactivé.
+- Désactivation et réactivation en un clic (après confirmation) par le mécanisme natif de Windows (celui du Gestionnaire des tâches) : aucune clé ni aucun raccourci n'est supprimé ou déplacé. Les programmes « système » demandent le mode administrateur.
+
+**Mode Performance**
+- Nouvelle page « Mode Performance » : sauvegarde du plan d'alimentation et des services, passage en Performances ultimes / élevées, arrêt temporaire de 7 services secondaires (Spooler, SysMain, wuauserv, DiagTrack, MapsBroker, Fax, RemoteRegistry) s'ils sont en cours d'exécution, vidage facultatif du cache RAM (proposé à chaque activation).
+- « Restaurer l'état initial » remet le plan d'origine et relance les services arrêtés. L'état est gardé dans `Data\GameMode.json` : la restauration reste possible après la fermeture de l'application. Administrateur requis.
+- Le gain (RAM disponible, services coupés) apparaît automatiquement dans le Bilan avant/après.
+
 ## 1.2.0
 
 **Bilan avant/après**
