@@ -110,9 +110,9 @@ Describe 'Bilan avant/après (en mémoire)' {
     $diag = New-DiagResult -Module 'Test' -Title 'Mon diagnostic' -Ctx $null
     Add-DiagSection $diag 'Section' -Body { param($s) Add-DiagItem $s 'Mesure' 'valeur' 'OK' }
 
-    It 'Les 8 indicateurs demandés' {
-        $rows.Count | Should Be 8
-        ($rows.Indicateur -join '|') | Should Match 'Disque .* libre\|RAM utilisée\|RAM disponible\|Services actifs\|Processus\|Périphériques audio|Programmes au démarrage|Fichiers temporaires\|Fichiers temporaires'
+    It 'Les 11 indicateurs (8 de base + sécurité + profil d''optimisation)' {
+        $rows.Count | Should Be 11
+        foreach ($n in 'Disque*', 'RAM utilisée', 'RAM disponible', 'Services actifs', 'Processus', 'Périphériques audio', 'Programmes au démarrage', 'Éléments suspects actifs', 'Menaces en quarantaine', 'Profil d''optimisation', 'Fichiers temporaires') { @($rows | Where-Object { $_.Indicateur -like $n }).Count | Should Be 1 }
     }
     It 'Disque : gain en Go libérés' {
         (Get-Row 'Disque*').Gain | Should Match '^\+4[,.]6 Go libérés$'
@@ -153,7 +153,7 @@ Describe 'Bilan avant/après (en mémoire)' {
         $bilan.Module | Should Be 'Bilan'
         $bilan.Sections.Count | Should Be 2
         ($bilan.Sections[1].Tables[0].Columns -join '|') | Should Be 'Indicateur|Avant|Après|Gain net'
-        $bilan.Sections[1].Tables[0].Rows.Count | Should Be 8
+        $bilan.Sections[1].Tables[0].Rows.Count | Should Be 11
     }
     It 'Export TXT : le bilan est ajouté automatiquement à la fin du rapport' {
         $f = Join-Path $TestDrive 'rapport.txt'
@@ -449,5 +449,249 @@ Describe 'Nettoyage automatique du demarrage' {
         $src | Should Match 'Invoke-StartupAutoClean -Confirmed'
         $src | Should Match 'Restore-StartupBackup -Confirmed'
         $src | Should Match "Start-BilanCapture 'nettoyage du démarrage' -Force"
+    }
+}
+
+Describe 'Security Guard : indices et heuristique' {
+    function Get-ReasonText([string]$Path, [string]$Command, [string]$Signature) { (@(Get-SuspicionReasons -Path $Path -Command $Command -Signature $Signature) | ForEach-Object Reason) -join ' | ' }
+    function Get-ScoreOf([string]$Path, [string]$Command, [string]$Signature) { $s = 0; foreach ($r in @(Get-SuspicionReasons -Path $Path -Command $Command -Signature $Signature)) { $s += $r.Weight }; $s }
+    It 'Double extension (executable deguise en document)' {
+        Get-ReasonText 'C:\Users\x\Downloads\facture.pdf.exe' '' 'NotSigned' | Should Match 'double extension'
+    }
+    It 'Caractere de lecture inversee dans le nom' {
+        Get-ReasonText ('C:\x\photo' + [char]0x202E + 'gpj.exe') '' '' | Should Match 'lecture inversée'
+    }
+    It 'Executable non signe dans Temp => suspect' {
+        $sc = Get-ScoreOf 'C:\Users\x\AppData\Local\Temp\a.exe' '' 'NotSigned'
+        Get-ThreatLevel $sc | Should Be 'Crit'
+    }
+    It 'Programme legitime signe dans Program Files : aucun indice' {
+        @(Get-SuspicionReasons -Path 'C:\Program Files\App\app.exe' -Signature 'Signed').Count | Should Be 0
+    }
+    It 'Nom de processus Windows hors du dossier Windows' {
+        Get-ReasonText 'C:\Users\x\AppData\Roaming\svchost.exe' '' 'Signed' | Should Match 'processus Windows'
+        Get-ReasonText 'C:\Windows\System32\svchost.exe' '' 'Signed' | Should Not Match 'processus Windows'
+    }
+    It 'Signature invalide = suspect' {
+        Get-ThreatLevel (Get-ScoreOf 'C:\Program Files\App\a.exe' '' 'Invalid') | Should Be 'Crit'
+    }
+    It 'Commande PowerShell encodee' {
+        Get-ReasonText '' ('powershell.exe -NoP -enc ' + ('A' * 30)) '' | Should Match 'encodée'
+    }
+    It 'Commande ordinaire : aucun indice' {
+        @(Get-SuspicionReasons -Path 'C:\Windows\notepad.exe' -Command 'notepad.exe C:\a.txt' -Signature 'Signed').Count | Should Be 0
+    }
+    It 'Niveaux 0 / 2 / 4' {
+        Get-ThreatLevel 0 | Should Be 'OK'
+        Get-ThreatLevel 2 | Should Be 'Warn'
+        Get-ThreatLevel 4 | Should Be 'Crit'
+    }
+    It 'Motif de test antivirus EICAR reconnu dans un texte (rien n est ecrit sur disque)' {
+        $e = 'X5O!P%@AP[4\PZX54(P^)7CC)7}$' + 'EICAR-STANDARD-' + 'ANTIVIRUS-TEST-FILE!' + '$H+H*'
+        @(Test-MaliciousScriptContent $e).Count | Should BeGreaterThan 0
+    }
+    It 'Script banal : aucun motif' {
+        @(Test-MaliciousScriptContent "Write-Host 'bonjour'`nGet-ChildItem C:\").Count | Should Be 0
+    }
+    It 'Les scripts ne sont pas juges sur l absence de signature' {
+        Get-FileSignatureState (Join-Path $Root 'PCToolkit.ps1') | Should Be 'NA'
+        Get-FileSignatureState (Join-Path $Root 'inexistant.exe') | Should Be 'Missing'
+    }
+}
+
+Describe 'Security Guard : scan de fichiers' {
+    $dir = Join-Path $TestDrive 'scan'
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    Set-Content -LiteralPath (Join-Path $dir 'facture.pdf.exe') -Value 'faux executable de test'
+    Set-Content -LiteralPath (Join-Path $dir 'outil.bat') -Value 'echo bonjour'
+    Set-Content -LiteralPath (Join-Path $dir 'notes.txt') -Value 'ignore (extension non analysee)'
+    $sha = (Get-FileHash -LiteralPath (Join-Path $dir 'outil.bat') -Algorithm SHA256).Hash.ToLower()
+    $res = @(Invoke-FileHeuristicScan -Ctx $null -Path $dir -KnownHashes @{ $sha = 'Programme de test' })
+    $sum = $res | Where-Object { $_.PSObject.Properties['ScanSummary'] } | Select-Object -Last 1
+    $found = @($res | Where-Object { $_.PSObject.Properties['Level'] })
+    It 'Resume : 2 fichiers analyses, le .txt est ignore' {
+        $sum.Scanned | Should Be 2
+        $sum.Hashed | Should Be 2
+    }
+    It 'Double extension signalee' {
+        $f = $found | Where-Object Name -eq 'facture.pdf.exe'
+        $f.Reasons | Should Match 'double extension'
+        $f.Level | Should Be 'Crit'
+    }
+    It 'Empreinte connue signalee' {
+        $f = $found | Where-Object Name -eq 'outil.bat'
+        $f.Reasons | Should Match 'empreinte connue : Programme de test'
+        $f.Sha256 | Should Be $sha
+    }
+    It 'Dossier sain : rien a signaler' {
+        $clean = Join-Path $TestDrive 'propre'; New-Item -ItemType Directory -Path $clean -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $clean 'a.txt') -Value 'rien'
+        $r = @(Invoke-FileHeuristicScan -Ctx $null -Path $clean)
+        @($r | Where-Object { $_.PSObject.Properties['Level'] }).Count | Should Be 0
+    }
+    It 'Annulation respectee' {
+        $r = @(Invoke-FileHeuristicScan -Ctx @{ Progress = 0; Status = ''; Cancel = $true } -Path $dir) | Where-Object { $_.PSObject.Properties['ScanSummary'] }
+        $r.Cancelled | Should Be $true
+    }
+    It 'Chemin inexistant : erreur claire' {
+        { Invoke-FileHeuristicScan -Ctx $null -Path (Join-Path $TestDrive 'nulle-part') } | Should Throw
+    }
+    It 'Le scan est en lecture seule (les fichiers sont toujours la)' {
+        Test-Path (Join-Path $dir 'facture.pdf.exe') | Should Be $true
+        Test-Path (Join-Path $dir 'outil.bat') | Should Be $true
+    }
+}
+
+Describe 'Security Guard : quarantaine securisee' {
+    $q = Join-Path $TestDrive 'quar'
+    $src = Join-Path $TestDrive 'depot'
+    New-Item -ItemType Directory -Path $src -Force | Out-Null
+    $f = Join-Path $src 'suspect.exe'
+    Set-Content -LiteralPath $f -Value 'contenu de test'
+    $sha0 = (Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLower()
+    It 'Refuse sans -Confirmed' {
+        { Move-FileToQuarantine -Path $f -QuarantineDir $q } | Should Throw
+        Test-Path $f | Should Be $true
+    }
+    It 'Isole le fichier (extension neutralisee), l inscrit dans l index, puis le restaure a l identique' {
+        $item = Move-FileToQuarantine -Path $f -Reason 'test' -Confirmed -QuarantineDir $q
+        Test-Path $f | Should Be $false
+        $item.Stored | Should Match '\.quar$'
+        Test-Path (Join-Path $q $item.Stored) | Should Be $true
+        $item.Sha256 | Should Be $sha0
+        @(Get-QuarantineItems -QuarantineDir $q).Count | Should Be 1
+        [void](Restore-FromQuarantine -Id $item.Id -Confirmed -QuarantineDir $q)
+        Test-Path $f | Should Be $true
+        (Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLower() | Should Be $sha0
+        @(Get-QuarantineItems -QuarantineDir $q).Count | Should Be 0
+    }
+    It 'La restauration n ecrase jamais un fichier existant' {
+        $item = Move-FileToQuarantine -Path $f -Confirmed -QuarantineDir $q
+        Set-Content -LiteralPath $f -Value 'nouveau fichier au meme endroit'
+        { Restore-FromQuarantine -Id $item.Id -Confirmed -QuarantineDir $q } | Should Throw
+        (Get-Content -LiteralPath $f -Raw) | Should Match 'nouveau fichier'
+        Remove-Item -LiteralPath $f -Force
+        [void](Restore-FromQuarantine -Id $item.Id -Confirmed -QuarantineDir $q)
+        Test-Path $f | Should Be $true
+    }
+    It 'Refuse les fichiers du dossier Windows' {
+        { Move-FileToQuarantine -Path (Join-Path $env:windir 'System32\notepad.exe') -Confirmed -QuarantineDir $q } | Should Throw
+        Test-Path (Join-Path $env:windir 'System32\notepad.exe') | Should Be $true
+    }
+    It 'Refuse les fichiers de PC Toolkit lui-meme' {
+        { Move-FileToQuarantine -Path (Join-Path $Root 'PCToolkit.ps1') -Confirmed -QuarantineDir $q } | Should Throw
+        Test-Path (Join-Path $Root 'PCToolkit.ps1') | Should Be $true
+    }
+    It 'Fichier introuvable : erreur claire' {
+        { Move-FileToQuarantine -Path (Join-Path $src 'fantome.exe') -Confirmed -QuarantineDir $q } | Should Throw
+    }
+    It 'Les taches Microsoft ne sont jamais desactivees' {
+        { Disable-SuspiciousTask -TaskName 'Test' -TaskPath '\Microsoft\Windows\Test\' -Confirmed -QuarantineDir $q } | Should Throw
+        { Disable-SuspiciousTask -TaskName 'Test' -TaskPath '\Autre\' -QuarantineDir $q } | Should Throw
+    }
+    It 'La liste blanche du demarrage l emporte (pilote graphique)' {
+        $e = [pscustomobject]@{ Name = 'NVIDIA Display Container'; Command = '"C:\Program Files\NVIDIA Corporation\nvcpl.exe"'; Path = 'C:\Program Files\NVIDIA Corporation\nvcpl.exe'; Source = 'test'; Scope = 'User'; Kind = 'Registry'; Enabled = $true; Missing = $false; KeyPath = 'x'; ValueName = 'NVIDIA'; ApprovedKey = 'HKCU:\Software\PCToolkitTest\Sec' }
+        { Disable-SuspiciousStartup -Entry $e -Confirmed -QuarantineDir $q } | Should Throw
+    }
+    It 'Un programme de demarrage suspect se desactive (cle de test) et se reactive' {
+        $key = 'HKCU:\Software\PCToolkitTest\Sec2'
+        try {
+            $e = [pscustomobject]@{ Name = 'Outil douteux'; Command = '"C:\Users\x\AppData\Local\Temp\x.exe"'; Path = 'C:\Users\x\AppData\Local\Temp\x.exe'; Source = 'test'; Scope = 'User'; Kind = 'Registry'; Enabled = $true; Missing = $false; KeyPath = 'x'; ValueName = 'OutilDouteux'; ApprovedKey = $key }
+            $item = Disable-SuspiciousStartup -Entry $e -Reason 'test' -Confirmed -QuarantineDir $q
+            Test-StartupApprovedEnabled ((Get-ItemProperty -LiteralPath $key -Name 'OutilDouteux').OutilDouteux) | Should Be $false
+            @(Get-QuarantineItems -QuarantineDir $q | Where-Object Kind -eq 'Startup').Count | Should Be 1
+            [void](Restore-FromQuarantine -Id $item.Id -Confirmed -QuarantineDir $q)
+            Test-StartupApprovedEnabled ((Get-ItemProperty -LiteralPath $key -Name 'OutilDouteux').OutilDouteux) | Should Be $true
+        } finally { Remove-Item -LiteralPath 'HKCU:\Software\PCToolkitTest' -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+Describe 'Security Guard : audit, rapport et bilan' {
+    It 'Audit : lignes valides, en lecture seule' {
+        $a = @(Invoke-SecurityAudit -Ctx $null)
+        $a.Count | Should BeGreaterThan 0
+        foreach ($x in $a) { $x.Status | Should Match '^(OK|Warn|Crit|Info|NA)$'; $x.Label | Should Not BeNullOrEmpty }
+    }
+    It 'Analyse rapide du demarrage : constats bien formes' {
+        $p = @(Get-StartupThreatFindings -Ctx $null -Quick)
+        foreach ($x in $p) { $x.Level | Should Match '^(OK|Warn|Crit)$' }
+    }
+    It 'Rapport exportable en TXT et HTML (resultat standard)' {
+        $f1 = New-SecurityFinding -Kind 'Fichier' -Name 'facture.pdf.exe' -Path 'C:\x\facture.pdf.exe' -Signature 'NotSigned'
+        $res = New-SecurityResult -Audit @([pscustomobject]@{ Label = 'Pare-feu'; Value = 'Actif'; Status = 'OK'; Detail = $null }) -Persistence @($f1) -FileScan $null
+        $res.Module | Should Be 'Security'
+        $t = Join-Path $TestDrive 'sec.txt'
+        [void](Export-DiagText -Results @($res) -Path $t)
+        (Get-Content -LiteralPath $t -Raw -Encoding UTF8) | Should Match 'double extension'
+        $h = Join-Path $TestDrive 'sec.html'
+        [void](Export-DiagHtml -Results @($res) -Path $h)
+        (Get-Content -LiteralPath $h -Raw -Encoding UTF8) | Should Match 'facture.pdf.exe'
+    }
+    It 'Bilan : menaces neutralisees et profil d optimisation raccordes au tableau' {
+        function Snap($o) { $s = [ordered]@{ Date = '2026-01-01 10:00:00'; IsAdmin = $false; DiskFreeBytes = [long]100GB; RamUsedPct = 50; RamUsedMB = 16000; RamFreeMB = 16000; ServicesRunning = 100; Processes = 200; AudioGhost = 0; StartupActive = 10; CacheBytes = [long]0; SuspectActive = 3; Quarantined = 0; TuningProfile = 'Aucun' }; foreach ($k in $o.Keys) { $s[$k] = $o[$k] }; [pscustomobject]$s }
+        $rows = @(Get-SnapshotComparison -Before (Snap @{}) -After (Snap @{ SuspectActive = 1; Quarantined = 2; TuningProfile = 'Preset Jeu' }))
+        $r1 = $rows | Where-Object { $_.Indicateur -eq 'Éléments suspects actifs' }
+        $r1.Gain | Should Be '-2 neutralisés'; $r1.Status | Should Be 'OK'
+        $r2 = $rows | Where-Object { $_.Indicateur -eq 'Menaces en quarantaine' }
+        $r2.Gain | Should Be '+2 isolées'; $r2.Status | Should Be 'OK'
+        $r3 = $rows | Where-Object { $_.Indicateur -like 'Profil d*optimisation' }
+        $r3.Avant | Should Be 'Aucun'; $r3.Apres | Should Be 'Preset Jeu'; $r3.Gain | Should Be 'Preset Jeu appliqué'
+    }
+    It 'La photo reelle expose les nouvelles mesures' {
+        $s = Get-SystemSnapshot -Ctx $null
+        ($s.PSObject.Properties.Name -contains 'SuspectActive') | Should Be $true
+        ($s.PSObject.Properties.Name -contains 'Quarantined') | Should Be $true
+        $s.TuningProfile | Should Not BeNullOrEmpty
+    }
+}
+
+Describe 'Presets d optimisation (Jeu / MAO / Bureautique)' {
+    $profiles = @(Get-TuningProfiles)
+    It 'Trois presets' {
+        ($profiles.Id -join ',') | Should Be 'Game,MAO,Office'
+    }
+    It 'Services : sous-ensemble de la liste officielle, jamais un service audio' {
+        $official = @(Get-GameModeServiceList | ForEach-Object Name)
+        foreach ($p in $profiles) { foreach ($s in $p.Services) { ($official -contains $s) | Should Be $true; $s | Should Not Match 'Audio' } }
+    }
+    It 'MAO ne vide pas la RAM (les echantillons restent en memoire), Jeu oui' {
+        ($profiles | Where-Object Id -eq 'MAO').FlushRam | Should Be $false
+        ($profiles | Where-Object Id -eq 'Game').FlushRam | Should Be $true
+    }
+    It 'Bureautique : plan et demarrage inchanges, nettoyage des temporaires' {
+        $o = $profiles | Where-Object Id -eq 'Office'
+        $o.Power | Should Be $false; $o.CleanStartup | Should Be $false; $o.CleanTemp | Should Be $true
+    }
+    It 'Refuse sans -Confirmed et refuse un preset inconnu' {
+        { Invoke-TuningProfile -Id 'Game' } | Should Throw
+        { Invoke-TuningProfile -Id 'Inconnu' -Confirmed } | Should Throw
+    }
+    It 'L apercu est en lecture seule et decrit le preset' {
+        $pl = Get-TuningPlan -Id 'Office'
+        $pl.Profile.Id | Should Be 'Office'
+        $pl.NeedsAdmin | Should Be $true
+    }
+    It 'Enable-GameMode accepte les options des presets (services limites, plan conserve, nom du profil)' {
+        $k = (Get-Command Enable-GameMode).Parameters.Keys
+        foreach ($n in 'OnlyServices', 'SkipPowerPlan', 'ProfileName') { ($k -contains $n) | Should Be $true }
+    }
+}
+
+Describe 'Interface v1.5 : jauges, console, transitions, Security Guard' {
+    $xaml = Get-Content -LiteralPath (Join-Path $Root 'UI\MainWindow.xaml') -Raw -Encoding UTF8
+    $code = Get-Content -LiteralPath (Join-Path $Root 'PCToolkit.ps1') -Raw -Encoding UTF8
+    It 'XAML : jauges CPU / RAM / disque, console, navigation Security Guard' {
+        foreach ($n in 'GaugeCpu', 'GaugeRam', 'GaugeDisk', 'LogBox', 'BtnLogClear', 'NavSecurity') { $xaml | Should Match "x:Name=`"$n`"" }
+    }
+    It 'Code : animations et mise a jour en direct' {
+        foreach ($f in 'Set-SmoothValue', 'Start-PageTransition', 'Update-LiveGauges', 'Update-LogConsole', 'Show-SecurityPage', 'Invoke-TuningPreset') { $code | Should Match "function $f" }
+    }
+    It 'Security Guard est une page, et ses actions passent par une confirmation' {
+        $code | Should Match "Security\s+= @\{ Nav = 'NavSecurity'"
+        $code | Should Match 'Move-FileToQuarantine -Path \$F\.Path -Reason \$F\.Reasons -Confirmed'
+        ([regex]::Matches($code, 'Confirm-Action')).Count | Should BeGreaterThan 6
+    }
+    It 'Les neutralisations alimentent le bilan' {
+        $code | Should Match 'Complete-Bilan -NoNavigate'
     }
 }

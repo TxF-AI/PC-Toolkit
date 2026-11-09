@@ -358,7 +358,9 @@ function Invoke-RamTrim {
 
 function Enable-GameMode {
     <# Sauvegarde l'état, passe en plan haute performance, arrête les services secondaires en cours d'exécution. #>
-    param([switch]$Confirmed, [switch]$FlushRam, [string]$StatePath)
+    # Presets : -OnlyServices limite la liste (sous-ensemble de la liste officielle), -SkipPowerPlan laisse le plan d'alimentation,
+    # -ProfileName est mémorisé dans l'état (affiché par le bilan et la page).
+    param([switch]$Confirmed, [switch]$FlushRam, [string]$StatePath, [string[]]$OnlyServices, [switch]$SkipPowerPlan, [string]$ProfileName)
     if (-not $Confirmed) { throw 'Confirmation explicite requise (-Confirmed).' }
     if (-not $StatePath) { $StatePath = Get-GameModeStatePath }
     if (-not (Test-IsAdmin)) { throw 'Le Mode Performance arrête des services : relancez PC Toolkit en administrateur.' }
@@ -366,14 +368,16 @@ function Enable-GameMode {
 
     $schemes = Get-PowerSchemes
     $before = $schemes | Where-Object Active | Select-Object -First 1
-    $running = @(foreach ($d in $script:GameModeServiceList) {
+    $candidates = @($script:GameModeServiceList | Where-Object { -not $OnlyServices -or $OnlyServices -contains $_.Name })
+    $running = @(foreach ($d in $candidates) {
         $s = $null; try { $s = Get-Service -Name $d.Name -ErrorAction Stop } catch { }
         if ($s -and $s.Status -eq 'Running') { $d.Name }
     })
     # Sauvegarde AVANT toute modification
     $state = [ordered]@{
         Date = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-        PreviousPlanGuid = $(if ($before) { $before.Guid } else { $null })
+        Profile = $(if ($ProfileName) { $ProfileName } else { 'Mode Performance' })
+        PreviousPlanGuid = $(if ($before -and -not $SkipPowerPlan) { $before.Guid } else { $null })
         PreviousPlanName = $(if ($before) { $before.Name } else { $null })
         CreatedPlanGuid = $null
         ServicesToStop = @($running)
@@ -386,7 +390,8 @@ function Enable-GameMode {
     $planNote = ''; $target = $null
     $ult = $schemes | Where-Object { $_.Guid -eq $script:UltimateGuid } | Select-Object -First 1
     $hi = $schemes | Where-Object { $_.Guid -eq $script:HighPerfGuid } | Select-Object -First 1
-    if ($ult) { $target = $ult } elseif ($hi) { $target = $hi }
+    if ($SkipPowerPlan) { $planNote = 'Plan d''alimentation conservé (non modifié par ce profil).' }
+    elseif ($ult) { $target = $ult } elseif ($hi) { $target = $hi }
     else {
         try {
             $o = (& powercfg.exe -duplicatescheme $script:UltimateGuid 2>$null) -join ' '
@@ -402,7 +407,7 @@ function Enable-GameMode {
         & powercfg.exe /setactive $target.Guid 2>$null
         if ($LASTEXITCODE -eq 0) { $planAfter = $target.Name; Write-AppLog "Mode Performance : plan « $planAfter » activé" 'ACTION' }
         else { $planNote = 'Windows a refusé le changement de plan d''alimentation.' }
-    } else { $planNote = 'Aucun plan haute performance disponible sur ce PC (plan inchangé).' }
+    } elseif (-not $SkipPowerPlan) { $planNote = 'Aucun plan haute performance disponible sur ce PC (plan inchangé).' }
 
     # Services
     $stopped = New-Object System.Collections.ArrayList
@@ -425,7 +430,7 @@ function Enable-GameMode {
 
     [pscustomobject]@{
         PlanBefore = $state.PreviousPlanName; PlanAfter = $planAfter; PlanNote = $planNote
-        Stopped = @($stopped); Failed = @($failed); AlreadyOff = @($script:GameModeServiceList | ForEach-Object { $_.Name } | Where-Object { $running -notcontains $_ })
+        Stopped = @($stopped); Failed = @($failed); AlreadyOff = @($candidates | ForEach-Object { $_.Name } | Where-Object { $running -notcontains $_ })
         Ram = $ram
     }
 }

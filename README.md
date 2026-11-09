@@ -35,7 +35,7 @@ Les deux suites de chiffres et de lettres doivent être identiques. Sinon, le fi
 
 | Page | Contenu |
 |---|---|
-| Tableau de bord | État général en 10 s : CPU, RAM, disque, pilote graphique, ping, événements critiques, points d'attention |
+| Tableau de bord | **Jauges en direct** (CPU, RAM, disque C:) puis état général en 10 s : pilote graphique, ping, événements critiques, points d'attention. Console de logs intégrée en bas de la fenêtre (actions en temps réel) |
 | Matériel | Processeur, mémoire (XMP, dual channel), carte graphique, BIOS, températures réellement exposées |
 | Réseau | Connexion, DNS et DoH, latence, gigue, pertes de paquets, rapidité DNS |
 | Windows | Version et fin de support, plantages, écrans bleus, journaux, services, démarrage, sécurité |
@@ -44,7 +44,8 @@ Les deux suites de chiffres et de lettres doivent être identiques. Sinon, le fi
 | Maintenance | Fichiers temporaires, corbeille, cache DNS, SFC, DISM, CHKDSK, point de restauration |
 | Historique et confidentialité | Fichiers récents et listes de raccourcis, téléchargements inachevés, remise à zéro des compteurs de données réseau (SRUM) |
 | Démarrage | Programmes lancés avec Windows (clés Run, dossiers Démarrage) : activation / désactivation en un clic, optimisation automatique avec liste blanche (pilotes, audio, sécurité) et restauration en un clic ; rien n'est supprimé |
-| Mode Performance | Plan haute performance + arrêt temporaire de services secondaires, restauration en un clic (administrateur requis) |
+| Mode Performance | **Presets 1-clic Jeu / MAO / Bureautique** (plan d'alimentation, services secondaires, cache RAM, fichiers temporaires, démarrage) ou Mode Performance manuel ; restauration en un clic (administrateur requis pour le plan et les services) |
+| Security Guard | Audit léger (**ce n'est pas un antivirus**) : état de Windows Defender et du pare-feu, éléments suspects au démarrage (clés Run, tâches planifiées, dossiers Temp/AppData), scan d'un fichier ou dossier (signature, double extension, empreintes connues, scripts malveillants connus). Mise en quarantaine ou désactivation après confirmation, restauration possible ; rien n'est supprimé |
 | Bilan avant/après | Mesure de départ au début du diagnostic, tableau comparatif à la fin des nettoyages (espace libéré, RAM, services, processus, programmes au démarrage, fichiers temporaires, périphériques audio fantômes). En mémoire ; ajouté à la fin des exports HTML et TXT |
 | Historique | Diagnostics enregistrés, export en rapport HTML ou TXT |
 
@@ -64,6 +65,7 @@ L'outil remet à zéro la base **SRUM** de Windows : la consommation de données
 - Les outils système (SFC, DISM, CHKDSK) s'ouvrent dans une fenêtre visible, après l'autorisation de Windows.
 - Aucune mesure n'est inventée : ce que Windows n'expose pas s'affiche « Non disponible ».
 - Rien n'est envoyé sur Internet, à part les pings et les requêtes DNS du test réseau.
+- **Security Guard ne supprime jamais rien** : un fichier suspect est déplacé dans `DataQuarantine` (restaurable), une tâche ou un démarrage est seulement désactivé. Ses constats sont des indices, pas des verdicts ; Windows Defender reste votre protection.
 - Le bouton **Relancer en administrateur** est facultatif : il permet seulement de lire plus d'informations (santé SMART, températures des disques).
 
 ## Désinstaller

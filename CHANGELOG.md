@@ -1,5 +1,33 @@
 # Nouveautés
 
+## 1.5.0
+
+**Interface modernisée (néon rouge et cyan)**
+- Tableau de bord : jauges animées en direct pour le processeur, la mémoire et le disque C: (couleur cyan, orange à 70 %, rouge à 90 %), rafraîchies chaque seconde.
+- Transitions fluides entre les onglets (fondu et glissement), barres de progression animées pendant les analyses et nettoyages, lueurs néon sur les titres et les jauges.
+- Console intégrée en bas de la fenêtre : les actions, avertissements et erreurs s'affichent en temps réel (journal du jour), avec boutons « Effacer » et « Réduire ».
+
+**Presets d'optimisation 1-clic** (page Mode Performance)
+- **Jeu** : plan Performances ultimes / élevées, arrêt temporaire de 7 services secondaires, vidage du cache RAM, nettoyage des fichiers temporaires et du démarrage.
+- **MAO** : plan haute performance, arrêt temporaire des services secondaires (Windows Update et SysMain inclus, sources de pics de latence), nettoyage du démarrage. La RAM n'est volontairement pas vidée (les échantillons et plugins chargés restent en mémoire). Les services audio ne sont jamais touchés.
+- **Bureautique** : plan conservé, arrêt de 4 services inutiles (télémétrie, cartes, fax, registre distant), nettoyage des fichiers temporaires.
+- Aperçu détaillé et confirmation avant application ; état sauvegardé et « Restaurer l'état initial » en un clic. Tout est exécuté en arrière-plan avec barre de progression.
+
+**Security Guard** (nouvelle page, audit léger : ce n'est pas un antivirus)
+- Audit système : service et protection en temps réel de Windows Defender, âge des définitions de virus, pare-feu (3 profils), contrôle de compte (UAC).
+- Éléments suspects : programmes de démarrage actifs, tâches planifiées hors Microsoft, exécutables et scripts à la racine de Temp, AppData et Public. Indices relevés : exécutable non signé ou à signature invalide, double extension, caractère de lecture inversée, nom de processus Windows hors du dossier Windows, commandes encodées ou téléchargeant du code.
+- Scan d'un fichier ou d'un dossier : signature, empreinte SHA-256 comparée à une liste de fichiers connus, motifs de scripts malveillants connus.
+- Quarantaine sécurisée (`Data\Quarantine\`) : fichier déplacé sous un nom neutralisé, tâche ou démarrage désactivé, jamais supprimé ; restauration en un clic. Garde-fous : dossier Windows, fichiers de PC Toolkit, tâches Microsoft et liste blanche du démarrage ne sont jamais touchés. Confirmation et journal pour chaque action.
+- Résultats exportables en HTML et TXT.
+
+**Bilan avant/après**
+- 3 nouveaux indicateurs (11 au total) : éléments suspects actifs, menaces en quarantaine, profil d'optimisation actif. Ils figurent aussi dans les exports TXT et HTML.
+- Une neutralisation de Security Guard met le bilan à jour sans quitter la page.
+
+**Technique**
+- Nouveaux modules `SecurityGuard.psm1` et `Tuning.psm1`. `Enable-GameMode` accepte une liste de services, l'option « plan conservé » et un nom de profil.
+- Le nom `Invoke-PersistenceScan` déclenchait l'antivirus sur le code source lui-même : les fonctions de détection portent des noms neutres.
+
 ## 1.4.0
 
 **Nettoyage automatique du démarrage**

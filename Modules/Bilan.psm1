@@ -25,6 +25,9 @@ function Get-SystemSnapshot {
         TempBytes      = $null
         RecycleBytes    = $null
         CacheBytes      = $null
+        SuspectActive   = $null
+        Quarantined     = $null
+        TuningProfile   = $null
     }
 
     Update-DiagProgress $Ctx 10 'Espace disque…'
@@ -54,6 +57,20 @@ function Get-SystemSnapshot {
 
     Update-DiagProgress $Ctx 85 'Périphériques audio…'
     try { $snap.AudioGhost = @(Get-PnpDevice -Class AudioEndpoint -ErrorAction Stop | Where-Object { $_.Present -eq $false }).Count } catch { }
+
+    Update-DiagProgress $Ctx 92 'Sécurité et profil d''optimisation…'
+    try {
+        if (Get-Command Get-SecuritySnapshotValues -ErrorAction SilentlyContinue) {
+            $sec = Get-SecuritySnapshotValues
+            $snap.SuspectActive = $sec.SuspectActive; $snap.Quarantined = $sec.Quarantined
+        }
+    } catch { }
+    try {
+        if (Get-Command Read-GameModeState -ErrorAction SilentlyContinue) {
+            $gm = Read-GameModeState -Path (Get-GameModeStatePath)
+            $snap.TuningProfile = if ($gm) { $(if ($gm.Profile) { [string]$gm.Profile } else { 'Mode Performance' }) } else { 'Aucun' }
+        }
+    } catch { }
 
     Update-DiagProgress $Ctx 100 'Photo terminée'
     [pscustomobject]$snap
@@ -96,6 +113,18 @@ function Get-SnapshotComparison {
            Get  = { param($x) $x.StartupActive }
            Show = { param($x) '{0:N0} actif{1}' -f $x.StartupActive, (& $s $x.StartupActive) }
            Gain = { param($b, $a, $d) $n = [math]::Abs($d); if ($d -lt 0) { '-{0:N0} programme{1} purgé{1}' -f $n, (& $s $n) } else { '+{0:N0} programme{1}' -f $n, (& $s $n) } } }
+        @{ Label = 'Éléments suspects actifs'; Good = 'Lower'; Tol = 0
+           Get  = { param($x) $x.SuspectActive }
+           Show = { param($x) '{0:N0}' -f $x.SuspectActive }
+           Gain = { param($b, $a, $d) $n = [math]::Abs($d); if ($d -lt 0) { '-{0:N0} neutralisé{1}' -f $n, (& $s $n) } else { '+{0:N0} à examiner' -f $n } } }
+        @{ Label = 'Menaces en quarantaine'; Good = 'Higher'; Tol = 0
+           Get  = { param($x) $x.Quarantined }
+           Show = { param($x) '{0:N0}' -f $x.Quarantined }
+           Gain = { param($b, $a, $d) $n = [math]::Abs($d); if ($d -gt 0) { '+{0:N0} isolée{1}' -f $n, (& $s $n) } else { '-{0:N0} restaurée{1}' -f $n, (& $s $n) } } }
+        @{ Label = 'Profil d''optimisation'; Good = 'Higher'; Tol = 0
+           Get  = { param($x) if ($null -eq $x.TuningProfile) { $null } elseif ($x.TuningProfile -eq 'Aucun') { 0 } else { 1 } }
+           Show = { param($x) [string]$x.TuningProfile }
+           Gain = { param($b, $a, $d) if ($d -gt 0) { "$($a.TuningProfile) appliqué" } else { 'profil désactivé' } } }
         @{ Label = 'Fichiers temporaires'; Good = 'Lower'; Tol = 1MB
            Get  = { param($x) $x.CacheBytes }
            Show = { param($x) Format-Bytes $x.CacheBytes }

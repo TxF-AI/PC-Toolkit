@@ -86,7 +86,8 @@ $script:Pages = [ordered]@{
     Audio       = @{ Nav = 'NavAudio';       Title = 'Audio';           Fn = 'Invoke-AudioDiagnostic';     Desc = 'Votre sortie et votre micro par défaut (carte son, USB, Bluetooth, HDMI…) : connexion, pilote, fréquences d''échantillonnage, ASIO, latence indicative.' }
     Maintenance = @{ Nav = 'NavMaintenance'; Title = 'Maintenance';     Custom = $true;                    Desc = 'Vérifications et nettoyage contrôlé. Chaque action qui modifie le système demande votre confirmation.' }
     Startup     = @{ Nav = 'NavStartup';     Title = 'Démarrage';       Custom = $true;                    Desc = 'Programmes lancés avec Windows. Désactiver n''en supprime aucun : vous pouvez les réactiver à tout moment.' }
-    Perf        = @{ Nav = 'NavPerf';        Title = 'Mode Performance'; Custom = $true;                   Desc = 'Plan d''alimentation haute performance et arrêt temporaire de services secondaires pour jouer ou faire de la MAO. Tout se remet en un clic.' }
+    Perf        = @{ Nav = 'NavPerf';        Title = 'Mode Performance'; Custom = $true;                   Desc = 'Presets 1-clic (Jeu, MAO, Bureautique) ou Mode Performance manuel : plan d''alimentation, services secondaires, cache RAM, fichiers temporaires. Tout se remet en un clic.' }
+    Security    = @{ Nav = 'NavSecurity';    Title = 'Security Guard';  Custom = $true;                    Desc = 'Audit de sécurité léger (ce n''est pas un antivirus) : Defender, pare-feu, programmes suspects au démarrage, scan de fichiers. Les éléments douteux sont isolés en quarantaine, jamais supprimés.' }
     Bilan       = @{ Nav = 'NavBilan';       Title = 'Bilan avant/après'; Custom = $true;                  Desc = 'Chaque nettoyage lancé depuis Maintenance, et chaque activation du Mode Performance, est mesuré automatiquement : espace libéré, RAM, services actifs, fichiers temporaires et périphériques audio fantômes.' }
     History     = @{ Nav = 'NavHistory';    Title = 'Historique';      Custom = $true;                    Desc = 'Diagnostics précédents : réouverture, comparaison et export HTML.' }
 }
@@ -126,7 +127,8 @@ function Start-BackgroundJob {
         foreach ($o in @($out)) { if ($o -and $o.PSObject.Properties['DurationSec']) { $o.DurationSec = [math]::Round($sw.Elapsed.TotalSeconds, 1) } }
         $out
     }).AddArgument($ModDir).AddArgument($Function).AddArgument($ctx).AddArgument($Params).AddArgument([bool]$Baseline)
-    $script:Job = @{ PS = $ps; RS = $rs; Handle = $ps.BeginInvoke(); Ctx = $ctx; OnComplete = $OnComplete; Function = $Function; Label = $StartText.TrimEnd('…', '.', ' ') }
+    $script:Job = @{ PS = $ps; RS = $rs; Handle = $ps.BeginInvoke(); Ctx = $ctx; OnComplete = $OnComplete; Function = $Function; Label = $StartText.TrimEnd('…', '.', ' '); Started = Get-Date }
+    Write-AppLog ("{0} : démarrage" -f $script:Job.Label)
     Set-Busy $true $StartText
     $script:Timer.Start()
 }
@@ -134,7 +136,7 @@ function Start-BackgroundJob {
 $script:Timer.Add_Tick({
     $j = $script:Job
     if (-not $j) { $script:Timer.Stop(); return }
-    $UI.Progress.Value = $j.Ctx.Progress
+    if ($j.Ctx.Progress -ne $script:LastProgress) { $script:LastProgress = $j.Ctx.Progress; Set-SmoothValue $UI.Progress $j.Ctx.Progress 320 }
     $UI.TxtStatus.Text = if ($j.Ctx.Cancel) { 'Annulation… (les résultats partiels seront affichés)' } else { '{0} · {1}' -f $j.Label, $j.Ctx.Status }
     if (-not $j.Handle.IsCompleted) { return }
 
@@ -143,6 +145,7 @@ $script:Timer.Add_Tick({
     try { $out = $j.PS.EndInvoke($j.Handle) } catch { $errs += $_.Exception.InnerException.Message; if (-not $errs[-1]) { $errs[-1] = $_.Exception.Message } }
     $errs += @($j.PS.Streams.Error | ForEach-Object { $_.Exception.Message })
     foreach ($e in $errs) { Write-AppLog "[$($j.Function)] $e" 'ERROR' }
+    Write-AppLog ("{0} : terminé en {1:N1} s" -f $j.Label, ((Get-Date) - $j.Started).TotalSeconds)
     $j.PS.Dispose(); $j.RS.Dispose()
     # Libère tout de suite la mémoire du runspace terminé (sinon .NET la garde jusqu'au prochain passage du ramasse-miettes)
     [GC]::Collect(); [GC]::WaitForPendingFinalizers()
@@ -157,6 +160,8 @@ function Set-Busy([bool]$Busy, [string]$Text = '') {
     $UI.BtnCancel.Visibility = if ($Busy) { 'Visible' } else { 'Collapsed' }
     $UI.BtnRun.IsEnabled = -not $Busy
     $UI.BtnExport.IsEnabled = (-not $Busy) -and [bool](Get-CurrentResult)
+    $script:LastProgress = -1
+    $UI.Progress.BeginAnimation([Windows.Controls.Primitives.RangeBase]::ValueProperty, $null)   # libère l'animation avant de remettre à zéro
     $UI.Progress.Value = 0
     $UI.TxtStatus.Text = $Text
     # La navigation reste libre pendant un diagnostic : seul le lancement d'une 2e tâche est bloqué
@@ -333,11 +338,14 @@ function Set-Page([string]$Page) {
     foreach ($o in 'OptNetwork', 'OptWindows', 'OptStorage') { $UI[$o].Visibility = if ($p.Opt -eq $o) { 'Visible' } else { 'Collapsed' } }
     $UI.BtnRun.Visibility = if ($p.Custom) { 'Collapsed' } else { 'Visible' }
     $UI.BtnExport.Visibility = if ($Page -in 'Maintenance', 'Startup', 'Perf') { 'Collapsed' } else { 'Visible' }
+    $UI.LiveGauges.Visibility = if ($Page -eq 'Dashboard') { 'Visible' } else { 'Collapsed' }
+    if ($Page -eq 'Dashboard') { Update-LiveGauges }
 
     switch ($Page) {
         'Maintenance' { Show-MaintenancePage }
         'Startup' { Show-StartupPage }
         'Perf' { Show-PerfPage }
+        'Security' { Show-SecurityPage }
         'Bilan' { Show-BilanPage }
         'History' { Show-HistoryPage }
         default {
@@ -347,6 +355,7 @@ function Set-Page([string]$Page) {
     }
     $UI.BtnExport.IsEnabled = [bool](Get-CurrentResult) -or ($Page -eq 'History')
     $UI.BtnRun.IsEnabled = -not $script:Job
+    if (-not $Snapshot) { Start-PageTransition }
 }
 
 function Get-PageParams([string]$Page) {
@@ -735,7 +744,8 @@ function Invoke-PerfRestore {
     $st = Get-GameModeStatus
     if (-not $st.ModeActive) { Show-Message 'Le Mode Performance n''est pas actif : rien à restaurer.' 'Mode Performance'; return }
     $n = @($st.State.ServicesStopped).Count
-    if (-not (Confirm-Action "Restaurer l'état initial ?`n`n • plan d'alimentation : « $($st.State.PreviousPlanName) »`n • $n service(s) à relancer : $(@($st.State.ServicesStopped) -join ', ')" 'Restaurer')) { return }
+    $planLine = if ($st.State.PreviousPlanGuid) { " • plan d'alimentation : « $($st.State.PreviousPlanName) »`n" } else { '' }
+    if (-not (Confirm-Action "Restaurer l'état initial ?`n`n$planLine • $n service(s) à relancer : $(@($st.State.ServicesStopped) -join ', ')" 'Restaurer')) { return }
     $old = $Window.Cursor
     try {
         $Window.Cursor = [Windows.Input.Cursors]::Wait
@@ -760,11 +770,36 @@ function Show-PerfPage {
     try { $st = Get-GameModeStatus } catch { Write-AppLog "Mode Performance : $($_.Exception.Message)" 'ERROR' }
     if (-not $st) { [void]$UI.ResultsPanel.Children.Add((New-Text 'État du Mode Performance indisponible.' 13 '#A8969B')); return }
 
+    # --- Presets 1-clic ---
+    $card = New-Card 12
+    $sp = New-Object Windows.Controls.StackPanel
+    $h = New-Text 'PRESETS D''OPTIMISATION 1-CLIC' 12 '#22E5FF' 'SemiBold'; $h.FontFamily = 'Bahnschrift SemiBold, Segoe UI Semibold'
+    [void]$sp.Children.Add($h)
+    $t = New-Text 'Un profil assemble plusieurs optimisations sûres, avec aperçu et confirmation avant toute action. Le résultat est mesuré dans le Bilan avant/après ; « Restaurer l''état initial » remet plan et services.' 12 '#C9B8BC' -Wrap
+    $t.Margin = '0,6,0,8'; [void]$sp.Children.Add($t)
+    $wp = New-Object Windows.Controls.WrapPanel
+    foreach ($pr in @(Get-TuningProfiles)) {
+        $b = New-ActionButton ("Preset {0}…" -f $pr.Name) 'AccentButton' "Preset_$($pr.Id)" { param($s, $e) Invoke-TuningPreset ([string]$s.Tag) } (-not $st.ModeActive)
+        $b.Tag = $pr.Id; $b.ToolTip = $pr.Details
+        [void]$wp.Children.Add($b)
+    }
+    [void]$sp.Children.Add($wp)
+    foreach ($pr in @(Get-TuningProfiles)) {
+        $l = New-Text ("{0} — {1}" -f $pr.Name, $pr.Summary) 11.5 '#9C8A8E' -Wrap; $l.Margin = '0,2,0,0'
+        [void]$sp.Children.Add($l)
+    }
+    if ($st.ModeActive) {
+        $w = New-Text 'Un profil est déjà actif : restaurez d''abord l''état initial (ci-dessous) pour en appliquer un autre.' 12 '#FFB020' -Wrap
+        $w.Margin = '0,8,0,0'; [void]$sp.Children.Add($w)
+    }
+    $card.Child = $sp
+    [void]$UI.ResultsPanel.Children.Add($card)
+
     $card = New-Card 12
     $sp = New-Object Windows.Controls.StackPanel
     $h = New-Text 'ÉTAT' 12 '#FF8A95' 'SemiBold'; $h.FontFamily = 'Bahnschrift SemiBold, Segoe UI Semibold'
     [void]$sp.Children.Add($h)
-    $mode = if ($st.ModeActive) { "Mode Performance ACTIF depuis le $($st.State.Date)." } else { 'Mode Performance inactif.' }
+    $mode = if ($st.ModeActive) { "$(if ($st.State.Profile) { $st.State.Profile } else { 'Mode Performance' }) ACTIF depuis le $($st.State.Date)." } else { 'Mode Performance inactif.' }
     $t = New-Text $mode 14 $(if ($st.ModeActive) { '#3DDC84' } else { '#FFFFFF' }) 'SemiBold'; $t.Margin = '0,6,0,4'; [void]$sp.Children.Add($t)
     $t = New-Text ("Plan d'alimentation actuel : {0}" -f $(if ($st.ActivePlan) { $st.ActivePlan } else { 'Non disponible' })) 12.5 '#C9B8BC'; [void]$sp.Children.Add($t)
     if (-not $st.IsAdmin) {
@@ -794,6 +829,249 @@ function Show-PerfPage {
     $n.Margin = '0,6,0,0'; [void]$sp.Children.Add($n)
     $card.Child = $sp
     [void]$UI.ResultsPanel.Children.Add($card)
+}
+
+#endregion
+
+#region Presets d'optimisation (Jeu / MAO / Bureautique) -----------------------------------------
+
+function Invoke-TuningPreset([string]$Id) {
+    $old = $Window.Cursor
+    $plan = $null
+    try { $Window.Cursor = [Windows.Input.Cursors]::Wait; $plan = Get-TuningPlan -Id $Id }
+    catch { Write-AppLog "Preset : $($_.Exception.Message)" 'ERROR'; Show-Message $_.Exception.Message 'Preset' 'Warning'; return }
+    finally { $Window.Cursor = $old }
+    $p = $plan.Profile
+    $l = @("Appliquer le preset « $($p.Name) » ?", '', $p.Details, '')
+    if ($p.Power -or $p.Services.Count) {
+        if (-not $plan.IsAdmin) { $l += '⚠ Plan d''alimentation et services : droits administrateur requis, cette étape sera ignorée (bouton « Relancer en administrateur »).' }
+        elseif ($plan.ModeActive) { $l += '⚠ Un profil est déjà actif : cette étape sera ignorée.' }
+        else {
+            if ($p.Power) { $l += "• Plan d'alimentation « $($plan.ActivePlan) » sauvegardé, puis performances élevées" }
+            $l += "• Services arrêtés temporairement ($(@($plan.ServicesToStop).Count)) : " + $(if (@($plan.ServicesToStop).Count) { (@($plan.ServicesToStop) | ForEach-Object Name) -join ', ' } else { 'aucun (déjà arrêtés)' })
+        }
+    }
+    if ($p.FlushRam) { $l += '• Cache RAM vidé (aucun programme fermé, effet temporaire)' }
+    if ($p.CleanTemp) { $l += "• Fichiers temporaires supprimés : $($plan.TempCount) fichier(s), $(if ($null -ne $plan.TempBytes) { Format-Bytes $plan.TempBytes } else { 'taille inconnue' })" }
+    if ($p.CleanStartup) { $l += "• Démarrage : $(@($plan.StartupTargets).Count) programme(s) superflu(s) désactivé(s) (liste blanche respectée, sauvegarde et restauration)" }
+    $l += ''; $l += 'Seuls les fichiers temporaires sont supprimés ; tout le reste se restaure.'
+    if (-not (Confirm-Action ($l -join "`n") "Preset $($p.Name)")) { return }
+
+    Start-BilanCapture "preset $($p.Name)" -Force
+    Start-BackgroundJob -Function 'Invoke-TuningProfile' -Params @{ Id = $Id; Confirmed = $true } -StartText "Preset $($p.Name) en cours…" -OnComplete {
+        param($out, $errs)
+        $res = @($out) | Where-Object { $_ -and $_.PSObject.Properties['Steps'] } | Select-Object -Last 1
+        if (-not $res) { Show-Message ("Le preset n'a pas pu aboutir.`n`n" + (($errs | Select-Object -First 3) -join "`n")) 'Preset' 'Error'; return }
+        $lines = foreach ($s in $res.Steps) { "{0} {1} : {2}" -f $(switch ($s.Status) { 'OK' { '✔' } 'Ignoré' { '–' } default { '✖' } }), $s.Step, $s.Detail }
+        Show-Message (($lines -join "`n") + "`n`nLe bilan avant/après va s'afficher.") "Preset $($res.Profile.Name) appliqué"
+        Complete-Bilan
+        if ($script:CurrentPage -eq 'Perf') { Show-PerfPage }
+    }
+}
+
+#endregion
+
+#region Page Security Guard ---------------------------------------------------------------------
+
+$script:Sec = @{ Audit = $null; Persist = $null; FileScan = $null }
+$script:SecMap = @{}
+
+function Update-SecurityResult {
+    <# Reconstruit le résultat exportable (HTML/TXT) à partir de ce qui est affiché. #>
+    try {
+        $fs = $null
+        if ($script:Sec.FileScan) { $fs = @{ Summary = $script:Sec.FileScan.Summary; Findings = @($script:Sec.FileScan.Findings) } }
+        $script:Results['Security'] = New-SecurityResult -Audit $script:Sec.Audit -Persistence $script:Sec.Persist -FileScan $fs
+        if ($script:CurrentPage -eq 'Security') { $UI.BtnExport.IsEnabled = $true }
+    } catch { Write-AppLog "Security Guard (rapport) : $($_.Exception.Message)" 'ERROR' }
+}
+
+function Invoke-SecurityFullScan {
+    Start-BackgroundJob -Function 'Invoke-SecurityAudit' -StartText 'Audit de sécurité en cours…' -Baseline -OnComplete {
+        param($out, $errs)
+        $base = @($out) | Where-Object { $_ -and $_.PSObject.Properties['DiskFreeBytes'] } | Select-Object -First 1
+        if ($base) { Set-BilanBaseline $base }
+        $script:Sec.Audit = @(@($out) | Where-Object { $_ -and $_.PSObject.Properties['Label'] })
+        Start-BackgroundJob -Function 'Invoke-StartupThreatScan' -StartText 'Analyse du démarrage, des tâches et des dossiers Temp/AppData…' -OnComplete {
+            param($out2, $errs2)
+            $script:Sec.Persist = @(@($out2) | Where-Object { $_ -and $_.PSObject.Properties['Level'] -and $_.PSObject.Properties['Kind'] })
+            Update-SecurityResult
+            if ($script:CurrentPage -eq 'Security') { Show-SecurityPage }
+        }
+    }
+}
+
+function Invoke-SecurityFileScan([string]$Path) {
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { Show-Message 'Chemin introuvable.' 'Security Guard' 'Warning'; return }
+    Start-BackgroundJob -Function 'Invoke-FileHeuristicScan' -Params @{ Path = $Path } -StartText 'Scan de fichiers en cours…' -Baseline -OnComplete {
+        param($out, $errs)
+        $base = @($out) | Where-Object { $_ -and $_.PSObject.Properties['DiskFreeBytes'] } | Select-Object -First 1
+        if ($base) { Set-BilanBaseline $base }
+        $sum = @($out) | Where-Object { $_ -and $_.PSObject.Properties['ScanSummary'] } | Select-Object -Last 1
+        if (-not $sum) { Show-Message ("Le scan n'a pas pu aboutir.`n`n" + (($errs | Select-Object -First 3) -join "`n")) 'Security Guard' 'Error'; return }
+        $script:Sec.FileScan = @{ Summary = $sum; Findings = @(@($out) | Where-Object { $_ -and $_.PSObject.Properties['Level'] -and $_.PSObject.Properties['Kind'] }) }
+        Update-SecurityResult
+        if ($script:CurrentPage -eq 'Security') { Show-SecurityPage }
+    }
+}
+
+function Remove-SecurityFinding($F) {
+    $keep = { param($list) @($list | Where-Object { -not ($_.Kind -eq $F.Kind -and $_.Name -eq $F.Name -and $_.Path -eq $F.Path) }) }
+    if ($script:Sec.Persist) { $script:Sec.Persist = & $keep $script:Sec.Persist }
+    if ($script:Sec.FileScan) { $script:Sec.FileScan.Findings = & $keep $script:Sec.FileScan.Findings }
+}
+
+function Invoke-SecurityNeutralize($F) {
+    $what = switch ($F.Kind) {
+        'Fichier' { "Isoler ce fichier dans la quarantaine ?`n`n$($F.Path)`n`nIl est déplacé (pas supprimé) vers Data\Quarantine sous un nom neutralisé : il ne peut plus s'exécuter. « Restaurer » le remet à sa place." }
+        'Tâche planifiée' { "Désactiver cette tâche planifiée ?`n`n$($F.Name)`n$($F.Command)`n`nElle n'est pas supprimée : vous pourrez la réactiver depuis la quarantaine." }
+        default { "Désactiver ce programme au démarrage de Windows ?`n`n$($F.Name)`n$($F.Command)`n`nRien n'est supprimé : vous pourrez le réactiver depuis la quarantaine." }
+    }
+    if (-not (Confirm-Action ($what + "`n`nIndices relevés : $($F.Reasons)`n`nCe sont des indices, pas une preuve : si vous reconnaissez ce programme, n'y touchez pas.") 'Security Guard')) { return }
+    Start-BilanCapture 'neutralisation Security Guard'
+    try {
+        switch ($F.Kind) {
+            'Fichier' { [void](Move-FileToQuarantine -Path $F.Path -Reason $F.Reasons -Confirmed) }
+            'Tâche planifiée' { [void](Disable-SuspiciousTask -TaskName $F.Target.TaskName -TaskPath $F.Target.TaskPath -Reason $F.Reasons -Confirmed) }
+            default { [void](Disable-SuspiciousStartup -Entry $F.Target -Reason $F.Reasons -Confirmed) }
+        }
+    } catch {
+        Write-AppLog "Security Guard : $($_.Exception.Message)" 'ERROR'
+        Show-Message $_.Exception.Message 'Security Guard' 'Warning'
+        return
+    }
+    Remove-SecurityFinding $F
+    Complete-Bilan -NoNavigate
+    Update-SecurityResult
+    Show-SecurityPage
+}
+
+function Invoke-SecurityRestore([string]$Id) {
+    $it = @(Get-QuarantineItems) | Where-Object { $_.Id -eq $Id } | Select-Object -First 1
+    if (-not $it) { return }
+    if (-not (Confirm-Action "Restaurer « $($it.Name) » ?`n`n$($it.OriginalPath)`n`nL'élément retrouve son état d'origine." 'Restaurer')) { return }
+    try { [void](Restore-FromQuarantine -Id $Id -Confirmed) }
+    catch { Write-AppLog "Security Guard (restauration) : $($_.Exception.Message)" 'ERROR'; Show-Message $_.Exception.Message 'Security Guard' 'Warning'; return }
+    if ($script:BilanAvant) { Complete-Bilan -NoNavigate }
+    Update-SecurityResult
+    Show-SecurityPage
+}
+
+function New-SecurityFindingRow($F, [string]$Key) {
+    $script:SecMap[$Key] = $F
+    $row = New-Card 8
+    $row.Padding = '14,10,14,10'
+    $dock = New-Object Windows.Controls.DockPanel
+    $label = switch ($F.Kind) { 'Fichier' { 'Mettre en quarantaine…' } 'Tâche planifiée' { 'Désactiver la tâche…' } default { 'Désactiver au démarrage…' } }
+    $btn = New-ActionButton $label 'AccentButton' "Sec_$Key" { param($s, $e) Invoke-SecurityNeutralize $script:SecMap[[string]$s.Tag] }
+    $btn.Tag = $Key; $btn.Margin = '12,0,0,0'; $btn.VerticalAlignment = 'Center'
+    [Windows.Controls.DockPanel]::SetDock($btn, 'Right')
+    [void]$dock.Children.Add($btn)
+    $left = New-Object Windows.Controls.StackPanel
+    $line = New-Object Windows.Controls.WrapPanel
+    $nm = New-Text $F.Name 14 '#FFFFFF' 'SemiBold'; $nm.Margin = '0,0,10,0'; [void]$line.Children.Add($nm)
+    $b = New-Badge $F.Level; $b.Child.Text = $(if ($F.Level -eq 'Crit') { 'Suspect' } else { 'À examiner' }); $b.Margin = '0,1,6,0'; [void]$line.Children.Add($b)
+    $b = New-Badge 'Info'; $b.Child.Text = $F.Kind; $b.Margin = '0,1,6,0'; [void]$line.Children.Add($b)
+    $b = New-Badge $(switch ($F.Signature) { 'Signed' { 'OK' } 'NotSigned' { 'Warn' } 'Invalid' { 'Crit' } default { 'NA' } })
+    $b.Child.Text = $(switch ($F.Signature) { 'Signed' { 'Signé' } 'NotSigned' { 'Non signé' } 'Invalid' { 'Signature invalide' } 'NA' { 'Script / non signable' } default { 'Signature inconnue' } })
+    $b.Margin = '0,1,6,0'; [void]$line.Children.Add($b)
+    [void]$left.Children.Add($line)
+    $r = New-Text $F.Reasons 12 '#FFB020' -Wrap; $r.Margin = '0,4,0,0'; [void]$left.Children.Add($r)
+    $pt = New-Text $(if ($F.Path) { $F.Path } else { $F.Command }) 11.5 '#A8969B' -Wrap; $pt.Margin = '0,2,0,0'; [void]$left.Children.Add($pt)
+    [void]$dock.Children.Add($left)
+    $row.Child = $dock
+    $row
+}
+
+function Add-FindingsCard([string]$Title, $Findings, [string]$KeyPrefix, [string]$Intro) {
+    $card = New-Card 12
+    $sp = New-Object Windows.Controls.StackPanel
+    $h = New-Text $Title 12 '#22E5FF' 'SemiBold'; $h.FontFamily = 'Bahnschrift SemiBold, Segoe UI Semibold'
+    [void]$sp.Children.Add($h)
+    $bad = @($Findings | Where-Object { $_.Level -ne 'OK' } | Sort-Object -Property @{ Expression = 'Score'; Descending = $true })
+    $t = New-Text ("{0} élément(s) analysé(s) : {1} à examiner. {2}" -f @($Findings).Count, $bad.Count, $Intro) 12.5 $(if ($bad.Count) { '#FFB020' } else { '#3DDC84' }) -Wrap
+    $t.Margin = '0,6,0,4'; [void]$sp.Children.Add($t)
+    $card.Child = $sp
+    [void]$UI.ResultsPanel.Children.Add($card)
+    $i = 0
+    foreach ($f in ($bad | Select-Object -First 50)) { [void]$UI.ResultsPanel.Children.Add((New-SecurityFindingRow $f "$KeyPrefix$i")); $i++ }
+    if ($bad.Count -gt 50) { [void]$UI.ResultsPanel.Children.Add((New-Text "… $($bad.Count - 50) autre(s) élément(s) dans l'export HTML/TXT." 12 '#A8969B')) }
+}
+
+function Show-SecurityPage {
+    $UI.ResultsPanel.Children.Clear()
+    $script:BusyDisable.Clear()
+    $script:SecMap = @{}
+
+    $card = New-Card 12
+    $sp = New-Object Windows.Controls.StackPanel
+    $h = New-Text 'SECURITY GUARD' 12 '#22E5FF' 'SemiBold'; $h.FontFamily = 'Bahnschrift SemiBold, Segoe UI Semibold'
+    [void]$sp.Children.Add($h)
+    $t = New-Text 'Audit léger, en lecture seule : état de Windows Defender et du pare-feu, programmes suspects au démarrage (clés Run, tâches planifiées, dossiers Temp/AppData), scan d''un fichier ou d''un dossier (signature, double extension, empreintes connues, scripts malveillants connus). Ce n''est PAS un antivirus : Windows Defender reste votre protection. Les éléments douteux se désactivent ou se mettent en quarantaine (Data\Quarantine), sans jamais être supprimés.' 12.5 '#C9B8BC' -Wrap
+    $t.Margin = '0,6,0,8'; [void]$sp.Children.Add($t)
+    if (-not (Test-IsAdmin)) {
+        $w = New-Text 'En mode standard, certaines tâches système ne peuvent pas être désactivées (administrateur requis).' 12 '#FFB020' -Wrap
+        $w.Margin = '0,0,0,8'; [void]$sp.Children.Add($w)
+    }
+    $wp = New-Object Windows.Controls.WrapPanel
+    [void]$wp.Children.Add((New-ActionButton 'Lancer l''audit complet' 'AccentButton' 'Sec_audit' { param($s, $e) Invoke-SecurityFullScan }))
+    [void]$wp.Children.Add((New-ActionButton 'Scanner un dossier…' 'GhostButton' 'Sec_folder' {
+        param($s, $e)
+        $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
+        $dlg.Description = 'Dossier à analyser (fichiers exécutables et scripts)'
+        $dlg.SelectedPath = $env:USERPROFILE
+        if ($dlg.ShowDialog() -eq 'OK') { Invoke-SecurityFileScan $dlg.SelectedPath }
+    }))
+    [void]$wp.Children.Add((New-ActionButton 'Scanner un fichier…' 'GhostButton' 'Sec_file' {
+        param($s, $e)
+        $dlg = New-Object System.Windows.Forms.OpenFileDialog
+        $dlg.Title = 'Fichier à analyser'
+        if ($dlg.ShowDialog() -eq 'OK') { Invoke-SecurityFileScan $dlg.FileName }
+    }))
+    if ($script:Results['Bilan']) { [void]$wp.Children.Add((New-ActionButton 'Voir le bilan avant/après' 'GhostButton' 'Sec_bilan' { param($s, $e) $UI.NavBilan.IsChecked = $true } -NoBusyLock)) }
+    [void]$sp.Children.Add($wp)
+    $card.Child = $sp
+    [void]$UI.ResultsPanel.Children.Add($card)
+
+    # Audit : rendu standard du résultat (même présentation que les diagnostics)
+    $res = $script:Results['Security']
+    if ($res) {
+        $aud = @($res.Sections) | Where-Object { $_.Title -eq 'Audit système' } | Select-Object -First 1
+        if ($aud) { Add-SectionCard $aud }
+    }
+    if ($null -ne $script:Sec.Persist) {
+        Add-FindingsCard 'DÉMARRAGE, TÂCHES ET DOSSIERS SUSPECTS' $script:Sec.Persist 'p' 'Indices, pas verdicts : un programme non signé ou lancé depuis AppData peut être légitime.'
+    }
+    if ($script:Sec.FileScan) {
+        $sum = $script:Sec.FileScan.Summary
+        Add-FindingsCard ('SCAN : ' + $sum.Path) $script:Sec.FileScan.Findings 'f' ("{0} fichier(s) examiné(s), {1} empreinte(s) calculée(s).{2}" -f $sum.Scanned, $sum.Hashed, $(if ($sum.Truncated) { ' Limite de fichiers atteinte : analyse partielle.' } elseif ($sum.Cancelled) { ' Analyse interrompue.' } else { '' }))
+    }
+
+    # Quarantaine
+    $q = @(Get-QuarantineItems)
+    $card = New-Card 12
+    $sp = New-Object Windows.Controls.StackPanel
+    $h = New-Text 'QUARANTAINE' 12 '#22E5FF' 'SemiBold'; $h.FontFamily = 'Bahnschrift SemiBold, Segoe UI Semibold'
+    [void]$sp.Children.Add($h)
+    $t = New-Text $(if ($q.Count) { "$($q.Count) élément(s) isolé(s). Dossier : Data\Quarantine. Rien n'est supprimé." } else { 'Aucun élément en quarantaine.' }) 12.5 '#C9B8BC' -Wrap
+    $t.Margin = '0,6,0,6'; [void]$sp.Children.Add($t)
+    $i = 0
+    foreach ($it in $q) {
+        $dock = New-Object Windows.Controls.DockPanel; $dock.Margin = '0,0,0,6'
+        $btn = New-ActionButton 'Restaurer…' 'GhostButton' "Sec_restore$i" { param($s, $e) Invoke-SecurityRestore ([string]$s.Tag) }
+        $btn.Tag = [string]$it.Id; $btn.Margin = '12,0,0,0'
+        [Windows.Controls.DockPanel]::SetDock($btn, 'Right')
+        [void]$dock.Children.Add($btn)
+        $left = New-Object Windows.Controls.StackPanel
+        $nm = New-Text ("{0}  ·  {1}  ·  {2}" -f $it.Name, $it.Kind, $it.Date) 13 '#FFFFFF' 'SemiBold'; [void]$left.Children.Add($nm)
+        $pt = New-Text ([string]$it.OriginalPath) 11.5 '#A8969B' -Wrap; [void]$left.Children.Add($pt)
+        [void]$dock.Children.Add($left)
+        [void]$sp.Children.Add($dock)
+        $i++
+    }
+    $card.Child = $sp
+    [void]$UI.ResultsPanel.Children.Add($card)
+    $UI.Scroller.ScrollToTop()
 }
 
 #endregion
@@ -834,13 +1112,15 @@ function Start-BilanCapture([string]$Operation = '', [switch]$Force) {
 }
 
 function Complete-Bilan {
+    # -NoNavigate : met le bilan à jour sans quitter la page en cours (neutralisations de Security Guard)
+    param([switch]$NoNavigate)
     if (-not $script:BilanAvant) { return }
     $apres = Get-SnapshotNow
     if (-not $apres) { return }
     try {
         $script:Results['Bilan'] = New-BilanResult -Before $script:BilanAvant -After $apres -Operation ($script:BilanOps -join ', ')
         if ($script:CurrentPage -eq 'Bilan') { Show-BilanPage; $UI.BtnExport.IsEnabled = $true }
-        else { $UI.NavBilan.IsChecked = $true }
+        elseif (-not $NoNavigate) { $UI.NavBilan.IsChecked = $true }
     } catch {
         Write-AppLog "Bilan : $($_.Exception.Message)" 'ERROR'
         Show-Message "Bilan impossible : $($_.Exception.Message)" 'Bilan' 'Error'
@@ -1010,6 +1290,119 @@ function Remove-SelectedHistory {
 
 #endregion
 
+#region Jauges en direct, transitions et console ------------------------------------------------
+
+if (-not ('PCToolkit.Sys' -as [type])) {
+    # Lecture directe de la charge CPU / RAM (indépendante de la langue de Windows, sans compteur de performance)
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+namespace PCToolkit {
+    public static class Sys {
+        [StructLayout(LayoutKind.Sequential)]
+        public struct MEMORYSTATUSEX { public uint dwLength; public uint dwMemoryLoad; public ulong ullTotalPhys; public ulong ullAvailPhys; public ulong ullTotalPageFile; public ulong ullAvailPageFile; public ulong ullTotalVirtual; public ulong ullAvailVirtual; public ulong ullAvailExtendedVirtual; }
+        [DllImport("kernel32.dll")] static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX s);
+        [DllImport("kernel32.dll")] static extern bool GetSystemTimes(out long idle, out long kernel, out long user);
+        public static double[] Memory() { var s = new MEMORYSTATUSEX(); s.dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX)); GlobalMemoryStatusEx(ref s); return new double[] { s.dwMemoryLoad, s.ullTotalPhys, s.ullAvailPhys }; }
+        public static long[] Times() { long i, k, u; GetSystemTimes(out i, out k, out u); return new long[] { i, k, u }; }
+    }
+}
+'@
+}
+
+function Set-SmoothValue($Bar, [double]$Value, [int]$Ms = 450) {
+    <# Anime la valeur d'une barre de progression (fluide, au lieu d'un saut). #>
+    $a = New-Object Windows.Media.Animation.DoubleAnimation
+    $a.To = $Value
+    $a.Duration = [TimeSpan]::FromMilliseconds($Ms)
+    $a.EasingFunction = New-Object Windows.Media.Animation.CubicEase
+    $Bar.BeginAnimation([Windows.Controls.Primitives.RangeBase]::ValueProperty, $a)
+}
+
+function Start-PageTransition {
+    <# Fondu + léger glissement vers le haut à chaque changement d'onglet. #>
+    try {
+        $tt = New-Object Windows.Media.TranslateTransform 0, 14
+        $UI.ResultsPanel.RenderTransform = $tt
+        $fade = New-Object Windows.Media.Animation.DoubleAnimation 0, 1, ([TimeSpan]::FromMilliseconds(260))
+        $slide = New-Object Windows.Media.Animation.DoubleAnimation 14, 0, ([TimeSpan]::FromMilliseconds(260))
+        $slide.EasingFunction = New-Object Windows.Media.Animation.CubicEase
+        $UI.ResultsPanel.BeginAnimation([Windows.UIElement]::OpacityProperty, $fade)
+        $tt.BeginAnimation([Windows.Media.TranslateTransform]::YProperty, $slide)
+    } catch { }
+}
+
+$script:PrevCpuTimes = $null
+function Set-Gauge($Bar, $Label, [double]$Pct, [string]$Text) {
+    $Label.Text = $Text
+    $Bar.Foreground = Get-Brush $(if ($Pct -ge 90) { '#FF2A3D' } elseif ($Pct -ge 70) { '#FFB020' } else { '#22E5FF' })
+    Set-SmoothValue $Bar $Pct 700
+}
+
+function Update-LiveGauges {
+    try {
+        $t = [PCToolkit.Sys]::Times()
+        if ($script:PrevCpuTimes) {
+            $dIdle = $t[0] - $script:PrevCpuTimes[0]; $dTot = ($t[1] - $script:PrevCpuTimes[1]) + ($t[2] - $script:PrevCpuTimes[2])
+            if ($dTot -gt 0) { $cpu = [math]::Round(100 * (1 - $dIdle / $dTot)); Set-Gauge $UI.GaugeCpu $UI.TxtGaugeCpu $cpu "$cpu %" }
+        }
+        $script:PrevCpuTimes = $t
+        $m = [PCToolkit.Sys]::Memory()
+        Set-Gauge $UI.GaugeRam $UI.TxtGaugeRam $m[0] ('{0:N0} % · {1:N1} / {2:N0} Go' -f $m[0], (($m[1] - $m[2]) / 1GB), ($m[1] / 1GB))
+        $d = [IO.DriveInfo]$env:SystemDrive
+        $usedPct = [math]::Round(100 * (1 - $d.AvailableFreeSpace / $d.TotalSize))
+        $UI.LblGaugeDisk.Text = "DISQUE $($env:SystemDrive)"
+        Set-Gauge $UI.GaugeDisk $UI.TxtGaugeDisk $usedPct ('{0} % · {1} libres' -f $usedPct, (Format-Bytes $d.AvailableFreeSpace))
+    } catch { }
+}
+
+# --- Console : relit en continu le journal du jour (actions, erreurs, démarrage/fin des analyses) ---
+$script:LogFile = $null; $script:LogPos = -1
+function Add-LogLine([string]$Line) {
+    $color = switch -Regex ($Line) { '\[ACTION\]' { '#22E5FF' } '\[ERROR\]' { '#FF5A6E' } '\[WARN\]' { '#FFB020' } default { '#9FB8BC' } }
+    $p = New-Object Windows.Documents.Paragraph
+    $p.Margin = [Windows.Thickness]::new(0)
+    $r = New-Object Windows.Documents.Run $Line
+    $r.Foreground = Get-Brush $color
+    [void]$p.Inlines.Add($r)
+    [void]$UI.LogBox.Document.Blocks.Add($p)
+    while ($UI.LogBox.Document.Blocks.Count -gt 300) { $UI.LogBox.Document.Blocks.Remove($UI.LogBox.Document.Blocks.FirstBlock) }
+}
+
+function Update-LogConsole {
+    try {
+        $file = Join-Path (Get-AppPath Logs) ('toolkit_{0:yyyyMMdd}.log' -f (Get-Date))
+        if (-not (Test-Path -LiteralPath $file)) { return }
+        $first = $false
+        if ($file -ne $script:LogFile) { $script:LogFile = $file; $script:LogPos = -1 }
+        $fs = [IO.File]::Open($file, 'Open', 'Read', 'ReadWrite')
+        $text = ''
+        try {
+            if ($script:LogPos -lt 0 -or $script:LogPos -gt $fs.Length) { $script:LogPos = [math]::Max(0, $fs.Length - 2500); $first = ($script:LogPos -gt 0) }
+            if ($fs.Length -gt $script:LogPos) {
+                [void]$fs.Seek($script:LogPos, 'Begin')
+                $sr = New-Object IO.StreamReader($fs, [Text.Encoding]::UTF8)
+                $text = $sr.ReadToEnd()
+                $script:LogPos = $fs.Length
+            }
+        } finally { $fs.Dispose() }
+        if (-not $text) { return }
+        $lines = @($text -split "`r?`n" | Where-Object { $_.Trim() })
+        if ($first -and $lines.Count) { $lines = @($lines | Select-Object -Skip 1) }   # première ligne possiblement coupée
+        foreach ($l in $lines) { Add-LogLine ($l.TrimStart([char]0xFEFF)) }
+        if ($lines.Count) { $UI.LogBox.ScrollToEnd() }
+    } catch { }
+}
+
+$script:UiTimer = New-Object Windows.Threading.DispatcherTimer
+$script:UiTimer.Interval = [TimeSpan]::FromMilliseconds(1000)
+$script:UiTimer.Add_Tick({
+    Update-LogConsole
+    if ($script:CurrentPage -eq 'Dashboard' -and $Window.WindowState -ne 'Minimized') { Update-LiveGauges }
+})
+
+#endregion
+
 #region Événements ------------------------------------------------------------------------
 
 foreach ($k in $script:Pages.Keys) {
@@ -1076,6 +1469,14 @@ try {
 } catch { $UI.TxtMachine.Text = $env:COMPUTERNAME }
 
 Write-AppLog "Démarrage (admin=$isAdmin)"
+$UI.BtnLogClear.Add_Click({ $UI.LogBox.Document.Blocks.Clear() })
+$UI.BtnLogToggle.Add_Click({
+    $open = $UI.LogBox.Visibility -eq 'Visible'
+    $UI.LogBox.Visibility = if ($open) { 'Collapsed' } else { 'Visible' }
+    $UI.BtnLogToggle.Content = if ($open) { 'Agrandir' } else { 'Réduire' }
+})
+Update-LogConsole
+$script:UiTimer.Start()
 Set-Page 'Dashboard'
 
 if ($Snapshot) {

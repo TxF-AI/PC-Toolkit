@@ -136,6 +136,27 @@
             </Setter>
         </Style>
 
+        <!-- Jauge en direct (CPU / RAM / disque) : la couleur de l'indicateur suit le Foreground, lueur cyan -->
+        <SolidColorBrush x:Key="Cyan" Color="#22E5FF"/>
+        <Style x:Key="GaugeBar" TargetType="ProgressBar">
+            <Setter Property="Height" Value="10"/>
+            <Setter Property="Minimum" Value="0"/>
+            <Setter Property="Maximum" Value="100"/>
+            <Setter Property="Foreground" Value="#22E5FF"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid>
+                            <Border x:Name="PART_Track" CornerRadius="5" Background="#1B0E14" BorderBrush="#2E1016" BorderThickness="1"/>
+                            <Border x:Name="PART_Indicator" CornerRadius="5" Background="{TemplateBinding Foreground}" HorizontalAlignment="Left">
+                                <Border.Effect><DropShadowEffect Color="#22E5FF" BlurRadius="12" ShadowDepth="0" Opacity="0.55"/></Border.Effect>
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Case à cocher -->
         <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="#B8A6AB"/>
@@ -315,6 +336,7 @@
                     <RadioButton x:Name="NavMaintenance" GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE90F;" Content="Maintenance"/>
                     <RadioButton x:Name="NavStartup"     GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE7E8;" Content="Démarrage"/>
                     <RadioButton x:Name="NavPerf"        GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE7FC;" Content="Mode Performance"/>
+                    <RadioButton x:Name="NavSecurity"    GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE72E;" Content="Security Guard"/>
                     <RadioButton x:Name="NavBilan"       GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE9D9;" Content="Bilan avant/après"/>
                     <RadioButton x:Name="NavHistory"    GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE81C;" Content="Historique"/>
                 </StackPanel>
@@ -328,6 +350,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- En-tête -->
@@ -360,6 +383,25 @@
 
             <!-- Options propres à certaines pages -->
             <StackPanel Grid.Row="1" Margin="0,14,0,0">
+                <!-- Jauges en direct (tableau de bord uniquement) -->
+                <Border x:Name="LiveGauges" Visibility="Collapsed" CornerRadius="10" Padding="18,12" Margin="0,0,0,4" Background="#120A0E" BorderBrush="#3A1620" BorderThickness="1">
+                    <Border.Effect><DropShadowEffect Color="#22E5FF" BlurRadius="22" ShadowDepth="0" Opacity="0.18"/></Border.Effect>
+                    <Grid>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,14,0">
+                            <DockPanel><TextBlock Text="PROCESSEUR" Foreground="{StaticResource Cyan}" FontSize="11" FontWeight="SemiBold"/><TextBlock x:Name="TxtGaugeCpu" Text="…" Foreground="#FFFFFF" FontFamily="{StaticResource Display}" FontSize="16" HorizontalAlignment="Right"/></DockPanel>
+                            <ProgressBar x:Name="GaugeCpu" Style="{StaticResource GaugeBar}" Margin="0,6,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Margin="7,0,7,0">
+                            <DockPanel><TextBlock Text="MÉMOIRE RAM" Foreground="{StaticResource Cyan}" FontSize="11" FontWeight="SemiBold"/><TextBlock x:Name="TxtGaugeRam" Text="…" Foreground="#FFFFFF" FontFamily="{StaticResource Display}" FontSize="16" HorizontalAlignment="Right"/></DockPanel>
+                            <ProgressBar x:Name="GaugeRam" Style="{StaticResource GaugeBar}" Margin="0,6,0,0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2" Margin="14,0,0,0">
+                            <DockPanel><TextBlock x:Name="LblGaugeDisk" Text="DISQUE C:" Foreground="{StaticResource Cyan}" FontSize="11" FontWeight="SemiBold"/><TextBlock x:Name="TxtGaugeDisk" Text="…" Foreground="#FFFFFF" FontFamily="{StaticResource Display}" FontSize="16" HorizontalAlignment="Right"/></DockPanel>
+                            <ProgressBar x:Name="GaugeDisk" Style="{StaticResource GaugeBar}" Margin="0,6,0,0"/>
+                        </StackPanel>
+                    </Grid>
+                </Border>
                 <StackPanel x:Name="OptNetwork" Orientation="Horizontal" Visibility="Collapsed">
                     <TextBlock Text="Durée du test de ping :" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
                     <RadioButton x:Name="Dur15"  GroupName="Dur" Style="{StaticResource Chip}" Content="15 s"/>
@@ -394,6 +436,23 @@
             <ScrollViewer x:Name="Scroller" Grid.Row="3" Margin="0,16,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                 <StackPanel x:Name="ResultsPanel" Margin="0,0,8,0"/>
             </ScrollViewer>
+
+            <!-- Console intégrée : actions et événements en temps réel (journal du jour) -->
+            <Border Grid.Row="4" Margin="0,12,0,0" CornerRadius="8" Background="#090507" BorderBrush="#2E1016" BorderThickness="1" Padding="12,6,12,8">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button x:Name="BtnLogClear" Content="Effacer" Style="{StaticResource GhostButton}" Padding="10,2" FontSize="11" Margin="0,0,6,0"/>
+                            <Button x:Name="BtnLogToggle" Content="Réduire" Style="{StaticResource GhostButton}" Padding="10,2" FontSize="11"/>
+                        </StackPanel>
+                        <TextBlock Text="&gt;_ CONSOLE" Foreground="{StaticResource Cyan}" FontFamily="{StaticResource Display}" FontSize="12" VerticalAlignment="Center">
+                            <TextBlock.Effect><DropShadowEffect Color="#22E5FF" BlurRadius="10" ShadowDepth="0" Opacity="0.6"/></TextBlock.Effect>
+                        </TextBlock>
+                    </DockPanel>
+                    <RichTextBox x:Name="LogBox" Height="84" IsReadOnly="True" Background="Transparent" BorderThickness="0" Foreground="#9FB8BC"
+                                 FontFamily="Consolas, Cascadia Mono" FontSize="11.5" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0"/>
+                </DockPanel>
+            </Border>
         </Grid>
     </Grid>
 </Window>

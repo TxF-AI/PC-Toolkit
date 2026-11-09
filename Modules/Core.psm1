@@ -192,7 +192,7 @@ function Get-DiagStats {
 
 #region Historique ----------------------------------------------------------------------
 
-$script:ModuleTitles = @{ Dashboard = 'Tableau de bord'; Hardware = 'Diagnostic matériel'; Network = 'Diagnostic réseau'; Windows = 'Analyse Windows'; Storage = 'Analyse du stockage'; Audio = 'Diagnostic audio'; Bilan = 'Bilan avant / après' }
+$script:ModuleTitles = @{ Dashboard = 'Tableau de bord'; Hardware = 'Diagnostic matériel'; Network = 'Diagnostic réseau'; Windows = 'Analyse Windows'; Storage = 'Analyse du stockage'; Audio = 'Diagnostic audio'; Bilan = 'Bilan avant / après'; Security = 'Security Guard' }
 
 function Save-DiagHistory {
     <#
