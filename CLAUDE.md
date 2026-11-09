@@ -20,7 +20,7 @@ Outil de diagnostic et de maintenance Windows : **Windows PowerShell 5.1 + WPF**
 ## Architecture
 - `PCToolkit.ps1` : interface (XAML `UI\MainWindow.xaml`), jobs en runspace avec hashtable synchronisée (`Progress`, `Status`, `Cancel`).
 - `Modules\Core.psm1` : modèle de résultat (`New-DiagResult` / `Add-DiagSection` / `Add-DiagItem`), historique JSON, exports HTML/TXT, `Get-AppVersion`.
-- Un module par page : Dashboard, Hardware, Network, WindowsAnalysis, Storage, Audio, Maintenance.
+- Un module par page : Dashboard, Hardware, Network, WindowsAnalysis, Storage, Audio, Maintenance, Bilan (photos avant/après dans `Data\Snapshots`, résultat au modèle standard donc exportable).
 - `VERSION` = seule source du numéro de version. `CHANGELOG.md` à compléter à chaque version.
 - `Installer.ps1` → `%LocalAppData%\PCToolkit` + entrée HKCU « Applications installées » ; `Desinstaller.ps1` (garde-fous de dossier).
 - `graphify-out/` : graphe du code. Après une modification de code : `graphify update .` (gratuit).

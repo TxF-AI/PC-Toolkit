@@ -1,5 +1,12 @@
 # Nouveautés
 
+## En préparation (pas encore dans le zip)
+
+**Bilan avant/après**
+- Nouvelle page : photo du PC avant, nettoyage avec les outils existants (aperçu et confirmation), photo après, puis tableau `INDICATEUR | AVANT | APRÈS | GAIN NET`.
+- Mesures : espace libre sur C:, RAM utilisée et disponible, services en cours, processus, fichiers temporaires + corbeille, périphériques audio actifs et fantômes. Une mesure indisponible s'affiche « Non disponible ».
+- Export HTML et TXT comme les autres pages, enregistrement dans l'historique.
+
 ## 1.1.0
 
 **Partage**

@@ -85,7 +85,8 @@ $script:Pages = [ordered]@{
     Storage     = @{ Nav = 'NavStorage';     Title = 'Stockage';        Fn = 'Invoke-StorageDiagnostic';   Desc = 'Espace libre, santé des disques, dossiers volumineux et recherche de gros fichiers. Rien n''est supprimé.'; Opt = 'OptStorage' }
     Audio       = @{ Nav = 'NavAudio';       Title = 'Audio';           Fn = 'Invoke-AudioDiagnostic';     Desc = 'Votre sortie et votre micro par défaut (carte son, USB, Bluetooth, HDMI…) : connexion, pilote, fréquences d''échantillonnage, ASIO, latence indicative.' }
     Maintenance = @{ Nav = 'NavMaintenance'; Title = 'Maintenance';     Custom = $true;                    Desc = 'Vérifications et nettoyage contrôlé. Chaque action qui modifie le système demande votre confirmation.' }
-    History     = @{ Nav = 'NavHistory';     Title = 'Historique';      Custom = $true;                    Desc = 'Diagnostics précédents : réouverture, comparaison et export HTML.' }
+    Bilan       = @{ Nav = 'NavBilan';       Title = 'Bilan avant/après'; Custom = $true;                  Desc = 'Prenez une photo du PC, nettoyez, puis comparez : espace libéré, RAM, services, processus, fichiers temporaires et périphériques audio fantômes.' }
+    History     = @{ Nav = 'NavHistory';    Title = 'Historique';      Custom = $true;                    Desc = 'Diagnostics précédents : réouverture, comparaison et export HTML.' }
 }
 $script:CurrentPage = 'Dashboard'
 $script:Results = @{}          # dernier résultat affiché par page
@@ -331,6 +332,7 @@ function Set-Page([string]$Page) {
 
     switch ($Page) {
         'Maintenance' { Show-MaintenancePage }
+        'Bilan' { Show-BilanPage }
         'History' { Show-HistoryPage }
         default {
             if ($script:Results[$Page]) { Show-DiagResult $script:Results[$Page]; $UI.TxtRun.Text = 'Relancer' }
@@ -533,6 +535,94 @@ function Show-MaintenancePage {
         }
         [void]$UI.ResultsPanel.Children.Add($wp)
     }
+}
+
+#endregion
+
+#region Page Bilan avant/après ----------------------------------------------------------------
+
+function Invoke-BilanSnapshot([string]$Which) {
+    $script:BilanWhich = $Which
+    $txt = if ($Which -eq 'avant') { 'Photo « avant » en cours…' } else { 'Photo « après » en cours…' }
+    Start-BackgroundJob -Function 'Get-SystemSnapshot' -StartText $txt -OnComplete {
+        param($out, $errs)
+        $snap = @($out) | Where-Object { $_ -and $_.PSObject.Properties['DiskFreeBytes'] } | Select-Object -Last 1
+        if (-not $snap) { Show-Message ("La photo du système n'a pas pu être prise.`n" + ($errs -join "`n")) 'Bilan' 'Error'; return }
+        try {
+            if ($script:BilanWhich -eq 'avant') {
+                [void](Save-SystemSnapshot $snap 'avant')
+                $script:Results.Remove('Bilan')
+            } else {
+                $avant = Get-SavedSnapshot 'avant'
+                if (-not $avant) { Show-Message 'Prenez d''abord la photo « avant ».' 'Bilan'; return }
+                [void](Save-SystemSnapshot $snap 'apres')
+                $res = New-BilanResult -Before $avant -After $snap
+                $script:Results['Bilan'] = $res
+                try { [void](Save-DiagHistory $res) } catch { Write-AppLog "Historique : $($_.Exception.Message)" 'ERROR' }
+                $UI.BtnExport.IsEnabled = $true
+            }
+        } catch {
+            Write-AppLog "Bilan : $($_.Exception.Message)" 'ERROR'
+            Show-Message "Bilan impossible : $($_.Exception.Message)" 'Bilan' 'Error'
+        }
+        if ($script:CurrentPage -eq 'Bilan') { Show-BilanPage }
+    }
+}
+
+function Show-BilanPage {
+    $UI.ResultsPanel.Children.Clear()
+    $script:BusyDisable.Clear()
+    $avant = Get-SavedSnapshot 'avant'
+
+    $addStep = {
+        param([string]$Num, [string]$Title, [string]$Desc, $Buttons)
+        $card = New-Card 10
+        $sp = New-Object Windows.Controls.StackPanel
+        $h = New-Text ("ÉTAPE $Num · " + $Title.ToUpper()) 12 '#FF8A95' 'SemiBold'; $h.FontFamily = 'Bahnschrift SemiBold, Segoe UI Semibold'
+        [void]$sp.Children.Add($h)
+        $d = New-Text $Desc 12.5 '#C9B8BC' -Wrap; $d.Margin = '0,6,0,10'
+        [void]$sp.Children.Add($d)
+        $wp = New-Object Windows.Controls.WrapPanel
+        foreach ($b in $Buttons) {
+            $btn = New-Object Windows.Controls.Button
+            $btn.Style = $Window.FindResource($b.Style)
+            $btn.Content = $b.Text; $btn.Margin = '0,0,10,6'; $btn.Tag = $b.Id
+            $btn.IsEnabled = -not $script:Job
+            [Windows.Automation.AutomationProperties]::SetAutomationId($btn, "Bilan_$($b.Id)")
+            $btn.Add_Click({
+                param($s, $e)
+                switch ([string]$s.Tag) {
+                    'avant' { Invoke-BilanSnapshot 'avant' }
+                    'apres' { Invoke-BilanSnapshot 'apres' }
+                    'temp' { Invoke-MaintenanceTool 'temp' }
+                    'recycle' { Invoke-MaintenanceTool 'recycle' }
+                    'maint' { $UI.NavMaintenance.IsChecked = $true }
+                }
+            })
+            [void]$script:BusyDisable.Add($btn)
+            [void]$wp.Children.Add($btn)
+        }
+        [void]$sp.Children.Add($wp)
+        $card.Child = $sp
+        [void]$UI.ResultsPanel.Children.Add($card)
+    }
+
+    $etat = if ($avant) { "Photo « avant » enregistrée le $($avant.Date)." } else { 'Aucune photo « avant » pour le moment.' }
+    & $addStep '1' 'Photo avant' ("Enregistre l'état actuel du PC (lecture seule, environ 5 secondes). $etat") @(
+        @{ Id = 'avant'; Text = $(if ($avant) { 'Refaire la photo avant' } else { 'Prendre la photo avant' }); Style = 'AccentButton' })
+    & $addStep '2' 'Optimiser' ("Lancez vos nettoyages : chacun affiche un aperçu et demande votre confirmation. Les autres optimisations (script de confidentialité Outils\Confidentialite-Debloat-Win11.ps1, nettoyage des périphériques audio fantômes) se lancent à part ; leur effet apparaîtra dans la photo « après ».") @(
+        @{ Id = 'temp'; Text = 'Fichiers temporaires…'; Style = 'GhostButton' }
+        @{ Id = 'recycle'; Text = 'Vider la corbeille…'; Style = 'GhostButton' }
+        @{ Id = 'maint'; Text = 'Tous les outils de maintenance'; Style = 'GhostButton' })
+    & $addStep '3' 'Photo après et comparaison' 'Reprend la photo et calcule les gains nets. Le résultat s''exporte en HTML ou TXT avec les boutons en haut.' @(
+        @{ Id = 'apres'; Text = 'Comparer avec la photo avant'; Style = $(if ($avant) { 'AccentButton' } else { 'GhostButton' }) })
+
+    $res = $script:Results['Bilan']
+    if ($res) {
+        Add-ResultHeader $res
+        foreach ($s in @($res.Sections)) { Add-SectionCard $s }
+    }
+    $UI.Scroller.ScrollToTop()
 }
 
 #endregion

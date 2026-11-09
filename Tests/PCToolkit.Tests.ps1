@@ -96,6 +96,71 @@ Describe 'Maintenance : garde-fous de suppression' {
     }
 }
 
+Describe 'Bilan avant/après' {
+    function New-FakeSnap($o = @{}) {
+        $s = [ordered]@{ Date = '2026-01-01 10:00:00'; IsAdmin = $false; DiskFreeBytes = [long]100GB; RamUsedPct = 50; RamFreeMB = 8000; ServicesRunning = 100; Processes = 200; TempBytes = [long]2GB; RecycleBytes = [long]0; CacheBytes = [long]2GB; AudioActive = 7; AudioGhost = 37 }
+        foreach ($k in $o.Keys) { $s[$k] = $o[$k] }
+        [pscustomobject]$s
+    }
+    $avant = New-FakeSnap
+    $apres = New-FakeSnap @{ DiskFreeBytes = [long](104.2GB); RamUsedPct = 32; RamFreeMB = 9100; ServicesRunning = 86; Processes = 200; CacheBytes = [long]0; AudioGhost = 0 }
+    $rows = @(Get-SnapshotComparison -Before $avant -After $apres)
+    function Get-Row([string]$Pattern) { $rows | Where-Object { $_.Indicateur -like $Pattern } }
+
+    It 'Une ligne par indicateur' { $rows.Count | Should Be 8 }
+    It 'Espace disque : gain en Go libérés' {
+        (Get-Row 'Espace libre*').Status | Should Be 'OK'
+        (Get-Row 'Espace libre*').Gain | Should Match '^\+4[,.]2 Go libérés$'
+    }
+    It 'RAM : occupation en baisse = amélioration' {
+        (Get-Row 'RAM utilisée').Gain | Should Match '^-18 points'
+        (Get-Row 'RAM utilisée').Status | Should Be 'OK'
+    }
+    It 'Services arrêtés et périphériques purgés' {
+        (Get-Row 'Services*').Gain | Should Match '^-14 service\(s\) arrêté\(s\)$'
+        (Get-Row '*fantômes').Gain | Should Match '^-37 fantôme\(s\) purgé\(s\)$'
+    }
+    It 'Valeur identique = Aucun changement (neutre)' {
+        (Get-Row 'Processus').Gain | Should Be 'Aucun changement'
+        (Get-Row 'Processus').Status | Should Be 'Info'
+    }
+    It 'Dégradation signalée (Warn)' {
+        $r = @(Get-SnapshotComparison -Before $avant -After (New-FakeSnap @{ Processes = 250 })) | Where-Object { $_.Indicateur -eq 'Processus' }
+        $r.Status | Should Be 'Warn'
+        $r.Gain | Should Match '^\+50 processus de plus$'
+    }
+    It 'Mesure manquante : Non disponible, jamais inventée' {
+        $r = @(Get-SnapshotComparison -Before $avant -After (New-FakeSnap @{ DiskFreeBytes = $null; AudioGhost = $null })) | Where-Object { $_.Indicateur -like 'Espace libre*' -or $_.Indicateur -like '*fantômes' }
+        @($r | Where-Object { $_.Status -eq 'NA' -and $_.Gain -eq 'Non disponible' -and $_.Apres -eq 'Non disponible' }).Count | Should Be 2
+    }
+    It 'Le résultat contient le tableau Avant / Après / Gain net' {
+        $res = New-BilanResult -Before $avant -After $apres
+        $res.Module | Should Be 'Bilan'
+        $res.Sections.Count | Should Be 2
+        ($res.Sections[1].Tables[0].Columns -join '|') | Should Be 'Indicateur|Avant|Après|Gain net'
+        $res.Sections[1].Tables[0].Rows.Count | Should Be 8
+    }
+    It 'La photo réelle est lisible (types plausibles, lecture seule)' {
+        $s = Get-SystemSnapshot -Ctx $null
+        $s.Date | Should Not BeNullOrEmpty
+        $s.DiskFreeBytes | Should BeGreaterThan 0
+        $s.RamUsedPct | Should BeLessThan 101
+        $s.Processes | Should BeGreaterThan 0
+    }
+    It 'Enregistrement et relecture d''une photo (dossier de test, pas celui de l''utilisateur)' {
+        $global:BilanTestRoot = $TestDrive
+        try {
+            InModuleScope Core { $script:RootSauve = $script:AppRoot; $script:AppRoot = $global:BilanTestRoot }
+            [void](Save-SystemSnapshot $apres 'avant')
+            (Get-SavedSnapshot 'avant').ServicesRunning | Should Be 86
+            Test-Path (Join-Path $TestDrive 'Data\Snapshots\avant.json') | Should Be $true
+        } finally {
+            InModuleScope Core { $script:AppRoot = $script:RootSauve }
+            Remove-Variable BilanTestRoot -Scope Global -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 Describe 'Distribution : zip, installation, désinstallation' {
     $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $version = (Get-Content -LiteralPath (Join-Path $Root 'VERSION') -TotalCount 1).Trim()
