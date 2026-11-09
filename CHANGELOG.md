@@ -17,6 +17,9 @@
 - Remise à zéro des compteurs de données réseau (SRUM), avec sauvegarde de l'ancienne base.
 - Nettoyage des fichiers récents et listes de raccourcis, des téléchargements inachevés et de la corbeille, avec aperçu avant suppression.
 
+**Outils (hors application, non inclus dans le zip)**
+- `Outils\Confidentialite-Debloat-Win11.ps1` : optimisation de la confidentialité de Windows 11, à lancer en administrateur. Coupe la télémétrie et le suivi publicitaire, désactive Bing et Cortana dans la recherche, les Widgets et les suggestions, et supprime les applications préinstallées inutiles. Aperçu avant toute modification, point de restauration et sauvegarde des anciens réglages (`-Restaurer` pour revenir en arrière).
+
 **Corrections**
 - Une seule liste des dates de fin de support de Windows, partagée par le Tableau de bord et la page Windows.
 

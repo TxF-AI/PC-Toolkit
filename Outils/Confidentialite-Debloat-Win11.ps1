@@ -123,7 +123,10 @@ function Disable-Task([string]$Cat, [string]$Label, [string]$TaskPath, [string]$
 function Remove-App([string]$Label, [string]$Pattern) {
     $Cat = 'Applications préinstallées'
     try {
-        if ($null -eq $script:Provisionnees) { $script:Provisionnees = @(Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue) }
+        if ($null -eq $script:Provisionnees) {
+            # Sur certains PC, cette liste renvoie « Accès refusé » même en administrateur : on continue avec les applis installées
+            try { $script:Provisionnees = @(Get-AppxProvisionedPackage -Online -ErrorAction Stop) } catch { $script:Provisionnees = @() }
+        }
         $pkgs = @(Get-AppxPackage -AllUsers -Name $Pattern -ErrorAction SilentlyContinue)
         $prov = @($script:Provisionnees | Where-Object { $_.DisplayName -like $Pattern })
         if (-not $pkgs.Count -and -not $prov.Count) { Add-Bilan $Cat $Label 'ABSENT'; return }
