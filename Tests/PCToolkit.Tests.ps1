@@ -110,9 +110,9 @@ Describe 'Bilan avant/après (en mémoire)' {
     $diag = New-DiagResult -Module 'Test' -Title 'Mon diagnostic' -Ctx $null
     Add-DiagSection $diag 'Section' -Body { param($s) Add-DiagItem $s 'Mesure' 'valeur' 'OK' }
 
-    It 'Les 7 indicateurs demandés' {
-        $rows.Count | Should Be 7
-        ($rows.Indicateur -join '|') | Should Match 'Disque .* libre\|RAM utilisée\|RAM disponible\|Services actifs\|Processus\|Périphériques audio\|Fichiers temporaires'
+    It 'Les 8 indicateurs demandés' {
+        $rows.Count | Should Be 8
+        ($rows.Indicateur -join '|') | Should Match 'Disque .* libre\|RAM utilisée\|RAM disponible\|Services actifs\|Processus\|Périphériques audio|Programmes au démarrage|Fichiers temporaires\|Fichiers temporaires'
     }
     It 'Disque : gain en Go libérés' {
         (Get-Row 'Disque*').Gain | Should Match '^\+4[,.]6 Go libérés$'
@@ -153,7 +153,7 @@ Describe 'Bilan avant/après (en mémoire)' {
         $bilan.Module | Should Be 'Bilan'
         $bilan.Sections.Count | Should Be 2
         ($bilan.Sections[1].Tables[0].Columns -join '|') | Should Be 'Indicateur|Avant|Après|Gain net'
-        $bilan.Sections[1].Tables[0].Rows.Count | Should Be 7
+        $bilan.Sections[1].Tables[0].Rows.Count | Should Be 8
     }
     It 'Export TXT : le bilan est ajouté automatiquement à la fin du rapport' {
         $f = Join-Path $TestDrive 'rapport.txt'
@@ -354,5 +354,100 @@ Describe 'Modules : pas de fonction en double' {
         }
         $dups = @($names | Group-Object | Where-Object Count -gt 1 | ForEach-Object Name)
         ($dups -join ', ') | Should Be ''
+    }
+}
+
+Describe 'Nettoyage automatique du demarrage' {
+    function New-FakeEntry($Name, $Path, $Enabled = $true, $Scope = 'User', $Key = 'HKCU:\Software\PCToolkitTest\Auto') {
+        [pscustomobject]@{ Name = $Name; Command = "`"$Path`""; Path = $Path; Source = 'test'; Scope = $Scope; Kind = 'Registry'; Enabled = $Enabled; Missing = $false; KeyPath = 'x'; ValueName = $Name; ApprovedKey = $Key }
+    }
+    $apps = 'C:\Users\x\AppData\Roaming'
+    It 'Detecte les applications superflues connues' {
+        foreach ($n in 'Spotify', 'Discord', 'Steam', 'Skype', 'OneDrive', 'GoogleUpdaterTaskUser157', 'SunJavaUpdateSched', 'MicrosoftEdgeAutoLaunch_ABC', 'Adobe Acrobat Update', 'CyberLink Launcher', 'Microsoft Teams') {
+            (Get-StartupRule (New-FakeEntry $n "$apps\$n\$n.exe")) | Should Not Be $null
+        }
+    }
+    It 'Liste blanche : pilotes graphiques, audio, securite et systeme ne sont jamais proteges a tort' {
+        $prot = @(
+            @('NVIDIA Display Container', 'C:\Program Files\NVIDIA Corporation\nvcpl.exe'), @('AMDNoiseSuppression', 'C:\Program Files\AMD\amd.exe'),
+            @('Intel Graphics Software', 'C:\Program Files\Intel\igcc.exe'), @('RtkAudUService', 'C:\Windows\System32\RtkAudUService64.exe'),
+            @('WavesLocalServer', 'C:\Program Files\Waves\wls.exe'), @('Focusrite Notifier', 'C:\Program Files\Focusrite\fn.exe'),
+            @('SecurityHealth', 'C:\Windows\System32\SecurityHealthSystray.exe'), @('Windows Defender notify', 'C:\Program Files\Windows Defender\x.exe'),
+            @('Avast Antivirus', 'C:\Program Files\Avast\avast.exe'), @('Riot Vanguard', 'C:\Program Files\Riot Vanguard\vgtray.exe'),
+            @('Pilote ASIO4ALL', 'C:\Program Files\ASIO4ALL\a.exe'), @('Outil', 'C:\Windows\System32\quelquechose.exe'))
+        foreach ($p in $prot) {
+            $e = New-FakeEntry $p[0] $p[1]
+            Test-StartupProtected $e | Should Be $true
+            (Get-StartupRule $e) | Should Be $null
+        }
+    }
+    It 'La liste blanche l''emporte meme si le nom evoque une cible (updater NVIDIA, Discord Audio)' {
+        (Get-StartupRule (New-FakeEntry 'NVIDIA Updater' 'C:\Program Files\NVIDIA\updater.exe')) | Should Be $null
+        (Get-StartupRule (New-FakeEntry 'Realtek Update Check' 'C:\Program Files\Realtek\u.exe')) | Should Be $null
+    }
+    It 'Un programme inconnu n''est pas touche' {
+        (Get-StartupRule (New-FakeEntry 'MonOutilPerso' "$apps\MonOutil\outil.exe")) | Should Be $null
+    }
+    It 'Le plan ne retient que les cibles actives et compte les elements proteges' {
+        $es = @((New-FakeEntry 'Spotify' "$apps\Spotify.exe"), (New-FakeEntry 'Discord' "$apps\Discord.exe" $false), (New-FakeEntry 'RtkAudUService' 'C:\Windows\System32\r.exe'), (New-FakeEntry 'MonOutilPerso' "$apps\o.exe"))
+        $plan = Get-StartupCleanupPlan -Entries $es
+        @($plan.Targets).Count | Should Be 1
+        $plan.Targets[0].Name | Should Be 'Spotify'
+        @($plan.Protected).Count | Should Be 1
+    }
+    It 'Les cibles systeme sont ecartees sans droits administrateur' {
+        $plan = Get-StartupCleanupPlan -Entries @(New-FakeEntry 'Spotify' "$apps\s.exe" $true 'Machine') -AssumeAdmin:$false
+        if (Test-IsAdmin) { Set-TestInconclusive 'session administrateur'; return }
+        @($plan.Targets).Count | Should Be 0
+        @($plan.NeedAdmin).Count | Should Be 1
+    }
+    It 'Invoke-StartupAutoClean et Restore-StartupBackup exigent -Confirmed' {
+        { Invoke-StartupAutoClean } | Should Throw
+        { Restore-StartupBackup } | Should Throw
+    }
+    It 'Nettoyage : sauvegarde, desactive les cibles, ignore la liste blanche meme forcee, puis restaure l''etat exact' {
+        $key = 'HKCU:\Software\PCToolkitTest\Auto'
+        $bk = Join-Path $TestDrive 'StartupBackup.json'
+        try {
+            [void](New-Item -Path $key -Force)
+            # Spotify : valeur "activee" explicite (06) ; Discord : valeur absente
+            Set-ItemProperty -LiteralPath $key -Name 'Spotify' -Value ([byte[]](6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)) -Type Binary
+            $es = @((New-FakeEntry 'Spotify' "$apps\Spotify.exe"), (New-FakeEntry 'Discord' "$apps\Discord.exe"), (New-FakeEntry 'RtkAudUService' 'C:\Windows\System32\r.exe'))
+            $r = Invoke-StartupAutoClean -Confirmed -Entries $es -BackupPath $bk
+            @($r.Disabled | ForEach-Object Name) -join ',' | Should Be 'Spotify,Discord'
+            $r.Protected | Should Be 1
+            Test-StartupApprovedEnabled (Get-ItemProperty $key).Spotify | Should Be $false
+            Test-StartupApprovedEnabled (Get-ItemProperty $key).Discord | Should Be $false
+            (Get-ItemProperty $key).PSObject.Properties.Name -contains 'RtkAudUService' | Should Be $false
+            $b = Read-StartupBackup -Path $bk
+            @($b.Items).Count | Should Be 2
+            $rr = Restore-StartupBackup -Confirmed -BackupPath $bk
+            @($rr.Restored).Count | Should Be 2
+            ((Get-ItemProperty $key).Spotify)[0] | Should Be 6
+            (Get-ItemProperty $key).PSObject.Properties.Name -contains 'Discord' | Should Be $false
+            Test-Path $bk | Should Be $false
+        } finally { Remove-Item 'HKCU:\Software\PCToolkitTest' -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+    It 'Sans cible, aucune sauvegarde n''est creee' {
+        $bk = Join-Path $TestDrive 'vide.json'
+        $r = Invoke-StartupAutoClean -Confirmed -Entries @(New-FakeEntry 'MonOutilPerso' "$apps\o.exe") -BackupPath $bk
+        @($r.Disabled).Count | Should Be 0
+        Test-Path $bk | Should Be $false
+    }
+    It 'Restauration sans sauvegarde : refus' {
+        { Restore-StartupBackup -Confirmed -BackupPath (Join-Path $TestDrive 'rien.json') } | Should Throw
+    }
+    It 'Le bilan compte les programmes de demarrage purges' {
+        $b = [pscustomobject]@{ Date = 'a'; IsAdmin = $true; StartupActive = 9 }
+        $a = [pscustomobject]@{ Date = 'b'; IsAdmin = $true; StartupActive = 5 }
+        $row = @(Get-SnapshotComparison -Before $b -After $a) | Where-Object Indicateur -eq 'Programmes au démarrage'
+        $row.Gain | Should Be '-4 programmes purgés'
+        $row.Status | Should Be 'OK'
+    }
+    It 'Garde-fou : l''interface appelle le nettoyage, la restauration et le bilan' {
+        $src = Get-Content -LiteralPath (Join-Path $Root 'PCToolkit.ps1') -Raw -Encoding UTF8
+        $src | Should Match 'Invoke-StartupAutoClean -Confirmed'
+        $src | Should Match 'Restore-StartupBackup -Confirmed'
+        $src | Should Match "Start-BilanCapture 'nettoyage du démarrage' -Force"
     }
 }

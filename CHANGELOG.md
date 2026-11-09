@@ -1,5 +1,14 @@
 # Nouveautés
 
+## 1.4.0
+
+**Nettoyage automatique du démarrage**
+- Bouton « Optimiser automatiquement le démarrage » (page Démarrage) : désactive les programmes superflus (planificateurs de mise à jour Google, Adobe, Java, Edge ; Spotify, Discord, Steam, Skype, Teams, OneDrive, CyberLink, lanceurs de jeux ; agents de télémétrie). La liste s'affiche et demande confirmation avant toute action.
+- **Liste blanche absolue** : pilotes graphiques (NVIDIA, AMD, Intel), audio (Realtek, Waves, ASIO, interfaces audio), sécurité (Defender, antivirus, anti-triche) et utilitaires système ne sont jamais désactivés, même si leur nom ressemble à une cible. Un programme inconnu n'est jamais touché.
+- Désactivation par le mécanisme natif de Windows (`StartupApproved`) : aucune clé ni aucun raccourci supprimé. L'état initial est sauvegardé dans `Data\StartupBackup.json` ; « Restaurer la sauvegarde » remet chaque programme exactement comme avant.
+- La page liste les programmes désactivés automatiquement avec leur statut.
+- Le Bilan avant/après compte désormais les « Programmes au démarrage » purgés (8 indicateurs), y compris dans les exports TXT et HTML.
+
 ## 1.3.0
 
 **Démarrage**

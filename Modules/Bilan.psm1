@@ -21,7 +21,8 @@ function Get-SystemSnapshot {
         ServicesRunning = $null
         Processes       = $null
         AudioGhost      = $null
-        TempBytes       = $null
+        StartupActive   = $null
+        TempBytes      = $null
         RecycleBytes    = $null
         CacheBytes      = $null
     }
@@ -47,6 +48,9 @@ function Get-SystemSnapshot {
         if (Get-Command Get-RecycleBinSize -ErrorAction SilentlyContinue) { $snap.RecycleBytes = [long](Get-RecycleBinSize).Bytes }
         if ($null -ne $snap.TempBytes -or $null -ne $snap.RecycleBytes) { $snap.CacheBytes = [long]$snap.TempBytes + [long]$snap.RecycleBytes }
     } catch { }
+
+    Update-DiagProgress $Ctx 70 'Programmes au démarrage…'
+    try { if (Get-Command Get-StartupItems -ErrorAction SilentlyContinue) { $snap.StartupActive = @(Get-StartupItems | Where-Object Enabled).Count } } catch { }
 
     Update-DiagProgress $Ctx 85 'Périphériques audio…'
     try { $snap.AudioGhost = @(Get-PnpDevice -Class AudioEndpoint -ErrorAction Stop | Where-Object { $_.Present -eq $false }).Count } catch { }
@@ -88,6 +92,10 @@ function Get-SnapshotComparison {
            Get  = { param($x) $x.AudioGhost }
            Show = { param($x) if ($x.AudioGhost -gt 0) { '{0:N0} fantôme{1}' -f $x.AudioGhost, (& $s $x.AudioGhost) } else { '0' } }
            Gain = { param($b, $a, $d) $n = [math]::Abs($d); if ($d -lt 0) { '-{0:N0} purgé{1}' -f $n, (& $s $n) } else { '+{0:N0}' -f $n } } }
+        @{ Label = 'Programmes au démarrage'; Good = 'Lower'; Tol = 0
+           Get  = { param($x) $x.StartupActive }
+           Show = { param($x) '{0:N0} actif{1}' -f $x.StartupActive, (& $s $x.StartupActive) }
+           Gain = { param($b, $a, $d) $n = [math]::Abs($d); if ($d -lt 0) { '-{0:N0} programme{1} purgé{1}' -f $n, (& $s $n) } else { '+{0:N0} programme{1}' -f $n, (& $s $n) } } }
         @{ Label = 'Fichiers temporaires'; Good = 'Lower'; Tol = 1MB
            Get  = { param($x) $x.CacheBytes }
            Show = { param($x) Format-Bytes $x.CacheBytes }

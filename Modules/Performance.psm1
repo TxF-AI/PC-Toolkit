@@ -147,6 +147,139 @@ function Set-StartupEntryState {
 
 #endregion
 
+#region Nettoyage automatique du démarrage --------------------------------------------------
+
+# LISTE BLANCHE : ces éléments ne sont JAMAIS désactivés automatiquement (pilotes graphiques et audio, sécurité,
+# anti-triche, utilitaires système). Elle l'emporte toujours sur la liste de cibles. En cas de doute : protégé.
+$script:StartupProtectPattern = '(?i)nvidia|nvcpl|nvbackend|nvtray|geforce|nvdisplay|\bamd\b|radeon|ati2|atieclxx|atiesrxx|cnext|igfx|intel|igcc|realtek|\brtk|ravbg|waves|maxx|asio|focusrite|goxlr|tc.?helicon|steinberg|native instruments|presonus|audio|sound|defender|windows security|securityhealth|mpcmdrun|msmpeng|antimalware|kaspersky|avast|\bavg\b|norton|mcafee|bitdefender|\beset\b|malwarebytes|sophos|trend micro|vanguard|vgc|vgtray|easyanticheat|battleye|faceit|ctfmon|explorer\.exe|sihost|synaptics|touchpad|bluetooth|[a-z]:\\windows\\(system32|syswow64)'
+
+# CIBLES : applications de confort qui n'ont pas besoin de démarrer avec Windows (elles s'ouvrent à la demande).
+$script:StartupTargetRules = @(
+    @{ Category = 'Mise à jour';          Label = 'Planificateur de mise à jour'; Pattern = '(?i)googleupdate|google ?updater|adobe.*(update|arm\b|aam)|adobegc|armsvc|jusched|sunjavaupdate|java update|microsoftedgeautolaunch|edgeupdate|microsoft edge update|update ?sched|update ?check|updater' }
+    @{ Category = 'Télémétrie';           Label = 'Agent de télémétrie';          Pattern = '(?i)telemetry|customer ?experience|\bceip\b' }
+    @{ Category = 'Lanceur / messagerie'; Label = 'Lanceur ou messagerie';        Pattern = '(?i)spotify|discord|\bsteam(\.exe|webhelper|\b)|skype|\bteams\b|msteams|cyberlink|powerdvd|youcam|epic ?games|rockstar|riotclient|riot client|curseforge|\bmedal\b|roblox|utweb|btweb|utorrent|bittorrent|slack|zoom|wondershare' }
+    @{ Category = 'Cloud / synchronisation'; Label = 'Synchronisation en arrière-plan'; Pattern = '(?i)onedrive|dropbox|creative ?cloud|ccxprocess' }
+)
+
+function Get-StartupBackupPath { Join-Path (Join-Path (Get-AppPath Root) 'Data') 'StartupBackup.json' }
+
+function Test-StartupProtected {
+    <# Vrai si l'élément est sur la liste blanche (nom, chemin ou commande). #>
+    param([Parameter(Mandatory)]$Entry)
+    $txt = "{0} {1} {2}" -f $Entry.Name, $Entry.Path, $Entry.Command
+    $txt -match $script:StartupProtectPattern
+}
+
+function Get-StartupRule {
+    <# Règle de nettoyage applicable ($null si aucune ou si l'élément est protégé). #>
+    param([Parameter(Mandatory)]$Entry)
+    if (Test-StartupProtected $Entry) { return $null }
+    $txt = "{0} {1} {2}" -f $Entry.Name, $Entry.Path, $Entry.Command
+    foreach ($r in $script:StartupTargetRules) { if ($txt -match $r.Pattern) { return [pscustomobject]@{ Category = $r.Category; Label = $r.Label } } }
+    $null
+}
+
+function Get-StartupCleanupPlan {
+    <# Lecture seule. Targets : à désactiver ; Protected : listés protégés ; NeedAdmin : cibles système sans droits admin. #>
+    param($Entries, [switch]$AssumeAdmin)
+    if ($null -eq $Entries) { $Entries = @(Get-StartupItems) }
+    $isAdmin = $AssumeAdmin -or (Test-IsAdmin)
+    $targets = @(); $protected = @(); $needAdmin = @()
+    foreach ($e in @($Entries)) {
+        if (Test-StartupProtected $e) { $protected += $e; continue }
+        if (-not $e.Enabled) { continue }
+        $rule = Get-StartupRule $e
+        if (-not $rule) { continue }
+        $item = [pscustomobject]@{ Entry = $e; Name = $e.Name; Category = $rule.Category; Label = $rule.Label; Source = $e.Source }
+        if ($e.Scope -eq 'Machine' -and -not $isAdmin) { $needAdmin += $item } else { $targets += $item }
+    }
+    [pscustomobject]@{ Targets = @($targets); NeedAdmin = @($needAdmin); Protected = @($protected) }
+}
+
+function Read-StartupBackup {
+    param([string]$Path)
+    if (-not $Path) { $Path = Get-StartupBackupPath }
+    try { if (Test-Path -LiteralPath $Path) { return (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json) } } catch { Write-AppLog "Sauvegarde démarrage illisible : $($_.Exception.Message)" 'WARN' }
+    $null
+}
+
+function Write-StartupBackup {
+    param([string]$Path, [Parameter(Mandatory)]$Items)
+    $dir = Split-Path -Parent $Path
+    if (-not (Test-Path -LiteralPath $dir)) { [void](New-Item -ItemType Directory -Path $dir -Force) }
+    if (@($Items).Count -eq 0) { Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue; return }
+    $obj = [ordered]@{ Date = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss'); Items = @($Items) }
+    [IO.File]::WriteAllText($Path, ($obj | ConvertTo-Json -Depth 6), (New-Object Text.UTF8Encoding($false)))
+}
+
+function Invoke-StartupAutoClean {
+    <#
+        Désactive les programmes de démarrage superflus (StartupApproved uniquement, rien n'est supprimé).
+        L'état initial de chaque élément est écrit dans Data\StartupBackup.json AVANT la modification.
+        La liste blanche est revérifiée ici, quelle que soit la liste reçue.
+    #>
+    param([switch]$Confirmed, $Entries, [string]$BackupPath)
+    if (-not $Confirmed) { throw 'Confirmation explicite requise (-Confirmed).' }
+    if (-not $BackupPath) { $BackupPath = Get-StartupBackupPath }
+    $plan = Get-StartupCleanupPlan -Entries $Entries
+    $skipped = @($plan.NeedAdmin | ForEach-Object { [pscustomobject]@{ Name = $_.Name; Reason = 'administrateur requis' } })
+    $backup = Read-StartupBackup -Path $BackupPath
+    $items = New-Object System.Collections.ArrayList
+    if ($backup) { foreach ($i in @($backup.Items)) { [void]$items.Add($i) } }
+
+    # 1. Sauvegarde de l'état initial, avant toute modification
+    $todo = @()
+    foreach ($t in $plan.Targets) {
+        $e = $t.Entry
+        $exists = $items | Where-Object { $_.ApprovedKey -eq $e.ApprovedKey -and $_.ValueName -eq $e.ValueName } | Select-Object -First 1
+        if (-not $exists) {
+            $prev = $null
+            try { $raw = (Get-ItemProperty -LiteralPath $e.ApprovedKey -Name $e.ValueName -ErrorAction Stop).($e.ValueName); if ($raw) { $prev = [Convert]::ToBase64String([byte[]]$raw) } } catch { }
+            [void]$items.Add([pscustomobject]@{ Name = $e.Name; Source = $e.Source; Scope = $e.Scope; Category = $t.Category; ApprovedKey = $e.ApprovedKey; ValueName = $e.ValueName; PreviousBytes = $prev; Applied = $false })
+        }
+        $todo += $t
+    }
+    if ($todo.Count -gt 0) { Write-StartupBackup -Path $BackupPath -Items $items }
+
+    # 2. Désactivation élément par élément
+    $disabled = @(); $failed = @()
+    foreach ($t in $todo) {
+        $e = $t.Entry
+        try {
+            [void](Set-StartupEntryState -Entry $e -Enabled $false -Confirmed)
+            ($items | Where-Object { $_.ApprovedKey -eq $e.ApprovedKey -and $_.ValueName -eq $e.ValueName } | Select-Object -First 1).Applied = $true
+            $disabled += [pscustomobject]@{ Name = $e.Name; Category = $t.Category; Source = $e.Source }
+        } catch { $failed += [pscustomobject]@{ Name = $e.Name; Reason = $_.Exception.Message } }
+        Write-StartupBackup -Path $BackupPath -Items @($items | Where-Object Applied)
+    }
+    Write-AppLog ("Démarrage : nettoyage automatique ({0} désactivé(s), {1} ignoré(s), {2} échec(s))" -f $disabled.Count, $skipped.Count, $failed.Count) 'ACTION'
+    [pscustomobject]@{ Disabled = @($disabled); Skipped = @($skipped); Failed = @($failed); Protected = $plan.Protected.Count }
+}
+
+function Restore-StartupBackup {
+    <# Remet chaque élément dans son état initial exact (valeur StartupApproved d'origine, ou absente). #>
+    param([switch]$Confirmed, [string]$BackupPath)
+    if (-not $Confirmed) { throw 'Confirmation explicite requise (-Confirmed).' }
+    if (-not $BackupPath) { $BackupPath = Get-StartupBackupPath }
+    $backup = Read-StartupBackup -Path $BackupPath
+    if (-not $backup -or @($backup.Items).Count -eq 0) { throw 'Aucune sauvegarde de démarrage à restaurer.' }
+    $isAdmin = Test-IsAdmin
+    $restored = @(); $remaining = @(); $failed = @()
+    foreach ($i in @($backup.Items)) {
+        if ($i.Scope -eq 'Machine' -and -not $isAdmin) { $remaining += $i; continue }
+        try {
+            if ($i.PreviousBytes) { Set-ItemProperty -LiteralPath $i.ApprovedKey -Name $i.ValueName -Value ([Convert]::FromBase64String($i.PreviousBytes)) -Type Binary -ErrorAction Stop }
+            else { Remove-ItemProperty -LiteralPath $i.ApprovedKey -Name $i.ValueName -ErrorAction SilentlyContinue }
+            $restored += $i.Name
+        } catch { $failed += $i.Name; $remaining += $i }
+    }
+    Write-StartupBackup -Path $BackupPath -Items $remaining
+    Write-AppLog ("Démarrage : restauration ({0} rétabli(s), {1} en attente)" -f $restored.Count, $remaining.Count) 'ACTION'
+    [pscustomobject]@{ Restored = @($restored); Remaining = @($remaining | ForEach-Object Name); Failed = @($failed) }
+}
+
+#endregion
+
 #region Mode Performance ---------------------------------------------------------------------
 
 function Get-GameModeStatePath { Join-Path (Join-Path (Get-AppPath Root) 'Data') 'GameMode.json' }
@@ -339,5 +472,6 @@ function Restore-GameMode {
 #endregion
 
 Export-ModuleMember -Function Get-StartupApprovedBytes, Test-StartupApprovedEnabled, Get-CommandExecutable, Get-StartupItems, Set-StartupEntryState,
-    Get-GameModeStatePath, Get-GameModeServiceList, Get-PowerSchemes, Get-GameModeStatus, Read-GameModeState, Write-GameModeState,
+    Get-StartupBackupPath, Test-StartupProtected, Get-StartupRule, Get-StartupCleanupPlan, Read-StartupBackup, Write-StartupBackup, Invoke-StartupAutoClean, Restore-StartupBackup,
+    Get-GameModeStatePath,Get-GameModeServiceList, Get-PowerSchemes, Get-GameModeStatus, Read-GameModeState, Write-GameModeState,
     Invoke-RamTrim, Enable-GameMode, Restore-GameMode

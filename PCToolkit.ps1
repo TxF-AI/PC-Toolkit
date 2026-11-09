@@ -576,6 +576,44 @@ function Switch-StartupEntry($Entry) {
     Show-StartupPage
 }
 
+function Invoke-StartupOptimize {
+    $plan = Get-StartupCleanupPlan
+    if (@($plan.Targets).Count -eq 0) { Show-Message 'Aucun programme superflu actif à désactiver.' 'Démarrage'; return }
+    $list = (@($plan.Targets) | ForEach-Object { " • $($_.Name)  ($($_.Category))" }) -join "`n"
+    $msg = "Désactiver automatiquement $(@($plan.Targets).Count) programme(s) au démarrage ?`n`n$list`n`nRien n'est supprimé : seul le lancement automatique est coupé. L'état initial est sauvegardé (Data\StartupBackup.json) et « Restaurer la sauvegarde » remet tout.`nPilotes graphiques/audio, sécurité et utilitaires système ne sont jamais touchés."
+    if (@($plan.NeedAdmin).Count -gt 0) { $msg += "`n`n$(@($plan.NeedAdmin).Count) autre(s) programme(s) système sont ignorés (administrateur requis)." }
+    if (-not (Confirm-Action $msg 'Optimiser le démarrage')) { return }
+    Start-BilanCapture 'nettoyage du démarrage' -Force
+    $old = $Window.Cursor
+    try {
+        $Window.Cursor = [Windows.Input.Cursors]::Wait
+        $r = Invoke-StartupAutoClean -Confirmed
+    } catch {
+        Write-AppLog "Démarrage (auto) : $($_.Exception.Message)" 'ERROR'
+        Show-Message $_.Exception.Message 'Démarrage' 'Warning'
+        return
+    } finally { $Window.Cursor = $old }
+    $lines = @("{0} programme(s) désactivé(s) : {1}" -f $r.Disabled.Count, $(if ($r.Disabled.Count) { ($r.Disabled | ForEach-Object Name) -join ', ' } else { 'aucun' }))
+    if ($r.Skipped.Count) { $lines += "Ignorés (administrateur requis) : " + (($r.Skipped | ForEach-Object Name) -join ', ') }
+    if ($r.Failed.Count) { $lines += "Échecs : " + (($r.Failed | ForEach-Object { "$($_.Name) ($($_.Reason))" }) -join '; ') }
+    Show-Message (($lines -join "`n") + "`n`nLe bilan avant/après va s'afficher.") 'Démarrage optimisé'
+    Complete-Bilan
+    if ($script:CurrentPage -eq 'Startup') { Show-StartupPage }
+}
+
+function Invoke-StartupRestore {
+    $b = Read-StartupBackup
+    if (-not $b -or @($b.Items).Count -eq 0) { Show-Message 'Aucune sauvegarde de démarrage à restaurer.' 'Démarrage'; return }
+    $list = (@($b.Items) | ForEach-Object { " • $($_.Name)" }) -join "`n"
+    if (-not (Confirm-Action "Remettre $(@($b.Items).Count) programme(s) dans leur état initial ?`n`n$list" 'Restaurer le démarrage')) { return }
+    try { $r = Restore-StartupBackup -Confirmed }
+    catch { Write-AppLog "Démarrage (restauration) : $($_.Exception.Message)" 'ERROR'; Show-Message $_.Exception.Message 'Démarrage' 'Warning'; return }
+    $lines = @("{0} programme(s) rétabli(s)." -f $r.Restored.Count)
+    if ($r.Remaining.Count) { $lines += "En attente (administrateur requis ou échec) : " + ($r.Remaining -join ', ') }
+    Show-Message ($lines -join "`n") 'Démarrage restauré'
+    Show-StartupPage
+}
+
 function Show-StartupPage {
     $UI.ResultsPanel.Children.Clear()
     $script:BusyDisable.Clear()
@@ -596,6 +634,38 @@ function Show-StartupPage {
         $w.Margin = '0,0,0,6'; [void]$sp.Children.Add($w)
     }
     [void]$sp.Children.Add((New-ActionButton 'Actualiser' 'GhostButton' 'Startup_refresh' { param($s, $e) Show-StartupPage }))
+    $card.Child = $sp
+    [void]$UI.ResultsPanel.Children.Add($card)
+
+    # --- Optimisation automatique ---
+    $plan = $null; try { $plan = Get-StartupCleanupPlan -Entries $entries } catch { Write-AppLog "Démarrage (plan) : $($_.Exception.Message)" 'ERROR' }
+    $backup = Read-StartupBackup
+    $bItems = if ($backup) { @($backup.Items) } else { @() }
+    $card = New-Card 12
+    $sp = New-Object Windows.Controls.StackPanel
+    $h = New-Text 'OPTIMISATION AUTOMATIQUE' 12 '#FF8A95' 'SemiBold'; $h.FontFamily = 'Bahnschrift SemiBold, Segoe UI Semibold'
+    [void]$sp.Children.Add($h)
+    $nT = if ($plan) { @($plan.Targets).Count } else { 0 }
+    $txt = if ($nT -gt 0) { "$nT programme(s) superflu(s) détecté(s) : " + ((@($plan.Targets) | ForEach-Object { $_.Name }) -join ', ') + '.' } else { 'Aucun programme superflu actif détecté.' }
+    if ($plan -and @($plan.NeedAdmin).Count -gt 0) { $txt += " $(@($plan.NeedAdmin).Count) autre(s) demande(nt) le mode administrateur." }
+    $t = New-Text $txt 12.5 '#C9B8BC' -Wrap; $t.Margin = '0,6,0,4'; [void]$sp.Children.Add($t)
+    $nP = if ($plan) { @($plan.Protected).Count } else { 0 }
+    $t = New-Text "Jamais touchés : pilotes graphiques et audio, sécurité (Defender, antivirus, anti-triche), utilitaires système ($nP élément(s) protégé(s) ici). Rien n'est supprimé ; l'état initial est sauvegardé pour une restauration en un clic." 11.5 '#9C8A8E' -Wrap
+    $t.Margin = '0,0,0,8'; [void]$sp.Children.Add($t)
+    $wp = New-Object Windows.Controls.WrapPanel
+    [void]$wp.Children.Add((New-ActionButton 'Optimiser automatiquement le démarrage…' 'AccentButton' 'Startup_auto' { param($s, $e) Invoke-StartupOptimize } ($nT -gt 0)))
+    [void]$wp.Children.Add((New-ActionButton ("Restaurer la sauvegarde ({0})…" -f $bItems.Count) 'GhostButton' 'Startup_restore' { param($s, $e) Invoke-StartupRestore } ($bItems.Count -gt 0)))
+    [void]$sp.Children.Add($wp)
+    if ($bItems.Count -gt 0) {
+        $h2 = New-Text 'DÉSACTIVÉS AUTOMATIQUEMENT' 11 '#FF8A95' 'SemiBold'; $h2.Margin = '0,8,0,6'; [void]$sp.Children.Add($h2)
+        foreach ($bi in $bItems) {
+            $line = New-Object Windows.Controls.WrapPanel; $line.Margin = '0,0,0,4'
+            $nm = New-Text $bi.Name 12.5 '#FFFFFF' 'SemiBold'; $nm.Margin = '0,0,10,0'; [void]$line.Children.Add($nm)
+            $b = New-Badge 'OK'; $b.Child.Text = 'Désactivé automatiquement'; $b.Margin = '0,1,6,0'; [void]$line.Children.Add($b)
+            $b = New-Badge 'Info'; $b.Child.Text = [string]$bi.Category; $b.Margin = '0,1,0,0'; [void]$line.Children.Add($b)
+            [void]$sp.Children.Add($line)
+        }
+    }
     $card.Child = $sp
     [void]$UI.ResultsPanel.Children.Add($card)
 
