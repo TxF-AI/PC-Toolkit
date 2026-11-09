@@ -695,3 +695,40 @@ Describe 'Interface v1.5 : jauges, console, transitions, Security Guard' {
         $code | Should Match 'Complete-Bilan -NoNavigate'
     }
 }
+
+Describe 'Audio : pilotes ASIO et interface Focusrite' {
+    # Régression : « Impossible de trouver un paramètre positionnel acceptant l'argument « Focusrite » »
+    # dans la section ASIO quand plusieurs pilotes portent le nom de la marque du périphérique par défaut.
+    Mock Get-AsioDrivers -ModuleName Audio {
+        @([pscustomobject]@{ Nom = 'Focusrite Thunderbolt ASIO'; Architecture = '64 bits'; Fichier = 'C:\x\ftb.dll'; Présent = 'Oui' },
+          [pscustomobject]@{ Nom = 'Focusrite USB ASIO'; Architecture = '64 bits'; Fichier = 'C:\x\fusb.dll'; Présent = 'Oui' },
+          [pscustomobject]@{ Nom = 'Focusrite USB ASIO'; Architecture = '32 bits'; Fichier = 'C:\x\fusb32.dll'; Présent = 'Oui' },
+          [pscustomobject]@{ Nom = 'Ancien Focusrite ASIO'; Architecture = '64 bits'; Fichier = 'C:\x\vieux.dll'; Présent = 'Non' },
+          [pscustomobject]@{ Nom = 'Realtek ASIO'; Architecture = '64 bits'; Fichier = 'C:\x\rt.dll'; Présent = 'Oui' })
+    }
+    Mock Get-DefaultAudioEndpoint -ModuleName Audio {
+        [pscustomobject]@{ Key = 'k1'; EndpointId = 'ep1'; Name = 'Haut-parleurs (Focusrite USB Audio)'; Device = 'Focusrite USB Audio'; Flow = 'Sortie'; State = 'Actif'; Rate = 48000; Bits = 24; Channels = 2 }
+    }
+    Mock Get-AudioDeviceInfo -ModuleName Audio {
+        [pscustomobject]@{ Name = 'Focusrite USB Audio'; Type = 'USB 2.0'; Hub = $null; InstanceId = 'USB\X'; Driver = 'Focusrite' }
+    }
+
+    $res = Invoke-AudioDiagnostic -Ctx $null
+    $sec = @($res.Sections | Where-Object { $_.Title -like 'Pilotes ASIO*' })[0]
+
+    It 'La section ASIO est produite sans erreur' {
+        $sec | Should Not BeNullOrEmpty
+        @($sec.Items | Where-Object { $_.Label -like 'Erreur*' }).Count | Should Be 0
+    }
+    It 'Le pilote dédié (USB) est choisi parmi plusieurs pilotes Focusrite' {
+        $m = @($sec.Items | Where-Object { $_.Label -like 'ASIO du périphérique*' })
+        $m.Count | Should Be 1
+        $m[0].Value | Should Be 'Focusrite USB ASIO'
+    }
+    It 'Les pilotes orphelins sont signalés' {
+        (@($sec.Items | Where-Object { $_.Label -like '*orphelins*' })[0]).Value | Should Match 'Ancien Focusrite'
+    }
+    It 'Aucune section du diagnostic audio ne contient d''erreur' {
+        @($res.Sections | ForEach-Object { $_.Items } | Where-Object { $_.Label -like 'Erreur*' }).Count | Should Be 0
+    }
+}

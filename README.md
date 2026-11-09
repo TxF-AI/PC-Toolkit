@@ -1,7 +1,7 @@
 # ⚡ PC//TOOLKIT — maintenance et diagnostic
 
 ![Version](https://img.shields.io/badge/version-v1.5.0-FF2A4D)
-![Tests Pester](https://img.shields.io/badge/tests%20Pester-143%2F143%20passing-brightgreen)
+![Tests Pester](https://img.shields.io/badge/tests%20Pester-147%2F147%20passing-brightgreen)
 ![Licence](https://img.shields.io/badge/licence-MIT-22E5FF)
 ![Compatibilité](https://img.shields.io/badge/PowerShell-5.1%2B%20%7C%20Windows%2010%20%26%2011-blue)
 
