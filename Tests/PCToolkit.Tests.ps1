@@ -2,6 +2,80 @@
 $Root = Split-Path $PSScriptRoot -Parent
 $ModDir = Join-Path $Root 'Modules'
 Get-ChildItem -LiteralPath $ModDir -Filter '*.psm1' | ForEach-Object { Import-Module $_.FullName -Force -DisableNameChecking }
+# Les tests comparent des textes français : langue forcée, sans toucher au réglage de l'utilisateur
+[void](Set-AppLanguage 'fr' -NoSave)
+
+Describe 'I18n' {
+    $fr = Import-PowerShellDataFile -LiteralPath (Join-Path $Root 'Lang\fr.psd1')
+    $en = Import-PowerShellDataFile -LiteralPath (Join-Path $Root 'Lang\en.psd1')
+
+    It 'chaque clé FR a son équivalent EN' {
+        $missing = @($fr.Keys | Where-Object { -not $en.ContainsKey($_) })
+        ($missing -join ', ') | Should Be ''
+    }
+    It 'aucune clé EN orpheline (absente du français)' {
+        $extra = @($en.Keys | Where-Object { -not $fr.ContainsKey($_) })
+        ($extra -join ', ') | Should Be ''
+    }
+    It 'aucune traduction vide' {
+        $empty = @(@($fr.Keys | Where-Object { -not $fr[$_] }) + @($en.Keys | Where-Object { -not $en[$_] }))
+        ($empty -join ', ') | Should Be ''
+    }
+    It 'les marqueurs {0}, {1}... sont les mêmes en FR et en EN' {
+        $bad = foreach ($k in $fr.Keys) {
+            if ($en.ContainsKey($k)) {
+                $a = ([regex]::Matches($fr[$k], '\{(\d+)')  | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique) -join ','
+                $b = ([regex]::Matches($en[$k], '\{(\d+)')  | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique) -join ','
+                if ($a -ne $b) { $k }
+            }
+        }
+        (@($bad) -join ', ') | Should Be ''
+    }
+    It 'Get-Text : français, anglais, repli sur le français puis sur la clé' {
+        [void](Set-AppLanguage 'fr' -NoSave)
+        Get-Text 'Nav.Hardware' | Should Be 'Matériel'
+        [void](Set-AppLanguage 'en' -NoSave)
+        Get-Text 'Nav.Hardware' | Should Be 'Hardware'
+        Get-Text 'Cle.Qui.Nexiste.Pas' | Should Be 'Cle.Qui.Nexiste.Pas'
+        [void](Set-AppLanguage 'fr' -NoSave)
+    }
+    It 'Get-Text formate les arguments et ne plante jamais' {
+        [void](Set-AppLanguage 'en' -NoSave)
+        Get-Text 'Gauge.Disk' 'C:' | Should Be 'DISK C:'
+        { Get-Text 'Gauge.Disk' } | Should Not Throw
+        { Get-Text '' } | Should Not Throw
+        { Get-Text $null } | Should Not Throw
+        { Get-Text 'Gauge.Disk' 1 2 3 } | Should Not Throw
+        [void](Set-AppLanguage 'fr' -NoSave)
+    }
+    It 'Set-AppLanguage refuse une langue inconnue' {
+        Set-AppLanguage 'xx' -NoSave | Should Be $false
+        Get-AppLanguage | Should Be 'fr'
+    }
+    It 'Set-AppLanguage -NoSave n''écrit rien dans Data' {
+        $f = Join-Path $Root 'Data\language.json'
+        $before = if (Test-Path $f) { (Get-Item $f).LastWriteTimeUtc } else { $null }
+        [void](Set-AppLanguage 'en' -NoSave); [void](Set-AppLanguage 'fr' -NoSave)
+        $after = if (Test-Path $f) { (Get-Item $f).LastWriteTimeUtc } else { $null }
+        "$after" | Should Be "$before"
+    }
+    It 'toute clé Nav.* et Page.*.Desc existe pour chaque page' {
+        $code = Get-Content -LiteralPath (Join-Path $Root 'PCToolkit.ps1') -Raw -Encoding UTF8
+        $pages = [regex]::Matches($code, "(?m)^\s{4}(\w+)\s+= @\{ Nav = 'Nav") | ForEach-Object { $_.Groups[1].Value }
+        @($pages).Count | Should BeGreaterThan 9
+        $miss = foreach ($p in $pages) { foreach ($k in "Nav.$p", "Page.$p.Desc") { if (-not $fr.ContainsKey($k)) { $k } } }
+        (@($miss) -join ', ') | Should Be ''
+    }
+    It 'les clés Get-Text utilisées dans le code existent' {
+        $files = @(Join-Path $Root 'PCToolkit.ps1') + @(Get-ChildItem -LiteralPath $ModDir -Filter '*.psm1' | Where-Object Name -ne 'I18n.psm1' | ForEach-Object FullName)
+        $used = foreach ($f in $files) {
+            $c = Get-Content -LiteralPath $f -Raw -Encoding UTF8
+            [regex]::Matches($c, "Get-Text\s+'([A-Za-z0-9_.]+)'") | ForEach-Object { $_.Groups[1].Value }
+        }
+        $miss = @($used | Sort-Object -Unique | Where-Object { -not $fr.ContainsKey($_) })
+        ($miss -join ', ') | Should Be ''
+    }
+}
 
 Describe 'Fichiers du projet' {
     $scripts = Get-ChildItem -LiteralPath $Root -Recurse -File |

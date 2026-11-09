@@ -23,7 +23,7 @@ $ErrorActionPreference = 'Stop'
 $src = $PSScriptRoot
 $files = 'PCToolkit.ps1', 'app.ico', 'README.md', 'CHANGELOG.md', 'VERSION', 'Lancer PC Toolkit.cmd', 'Installer.cmd', 'Installer.ps1', 'Desinstaller.ps1'
 $version = try { (Get-Content -LiteralPath (Join-Path $src 'VERSION') -TotalCount 1).Trim() } catch { '0.0.0' }
-$dirs = 'Modules', 'UI'
+$dirs = 'Modules', 'UI', 'Lang'
 # « / » est interdit dans un nom de fichier Windows : on utilise la barre de division Unicode (∕), identique à l'écran.
 $shortcutName = [string][char]0x26A1 + ' PC' + [char]0x2215 + [char]0x2215 + 'TOOLKIT'
 

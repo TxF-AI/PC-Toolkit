@@ -9,7 +9,7 @@ param([string]$OutDir = [Environment]::GetFolderPath('Desktop'))
 $ErrorActionPreference = 'Stop'
 $src = $PSScriptRoot
 $version = (Get-Content -LiteralPath (Join-Path $src 'VERSION') -TotalCount 1).Trim()
-$include = 'PCToolkit.ps1', 'app.ico', 'README.md', 'LICENSE', 'CHANGELOG.md', 'VERSION', 'Lancer PC Toolkit.cmd', 'Installer.cmd', 'Installer.ps1', 'Desinstaller.ps1', 'Modules', 'UI'
+$include = 'PCToolkit.ps1', 'app.ico', 'README.md', 'LICENSE', 'CHANGELOG.md', 'VERSION', 'Lancer PC Toolkit.cmd', 'Installer.cmd', 'Installer.ps1', 'Desinstaller.ps1', 'Modules', 'UI', 'Lang'
 
 # 1. Contrôles
 $problems = @()

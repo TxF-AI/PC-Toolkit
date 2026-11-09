@@ -26,7 +26,7 @@ $ModDir = Join-Path $AppRoot 'Modules'
 # Garde-fou : lancé depuis un zip non extrait, les dossiers Modules et UI sont absents
 if (-not (Test-Path -LiteralPath (Join-Path $ModDir 'Core.psm1')) -or -not (Test-Path -LiteralPath (Join-Path $AppRoot 'UI\MainWindow.xaml'))) {
     Add-Type -AssemblyName System.Windows.Forms
-    [void][System.Windows.Forms.MessageBox]::Show("Des fichiers de PC Toolkit sont introuvables (dossiers Modules et UI).`n`nSi vous l'ouvrez depuis un fichier .zip : clic droit sur le zip > « Extraire tout… », puis relancez.", 'PC Toolkit', 'OK', 'Warning')
+    [void][System.Windows.Forms.MessageBox]::Show("Des fichiers de PC Toolkit sont introuvables (dossiers Modules et UI).`n`nSi vous l'ouvrez depuis un fichier .zip : clic droit sur le zip > « Extraire tout… », puis relancez.`n`n(Some PC Toolkit files cannot be found. If you opened it from a .zip: right-click > Extract all, then launch again.)", 'PC Toolkit', 'OK', 'Warning')
     return
 }
 
@@ -60,10 +60,8 @@ foreach ($n in $xaml.SelectNodes('//*[@*[local-name()="Name"]]')) {
     $UI[$name] = $Window.FindName($name)
 }
 
-# Version (fichier VERSION) affichée dans la barre latérale et le titre
+# Version (fichier VERSION) affichée dans la barre latérale et le titre (textes posés par Update-UiLanguage)
 $AppVersion = Get-AppVersion
-$UI.TxtVersion.Text = "v$AppVersion · lecture seule par défaut"
-$Window.Title = "PC Toolkit $AppVersion — Maintenance & Diagnostic"
 
 # Icône (éclair néon) pour la fenêtre et la barre des tâches
 try { $Window.Icon = [Windows.Media.Imaging.BitmapFrame]::Create([Uri](Join-Path $AppRoot 'app.ico')) } catch { }
@@ -71,25 +69,32 @@ try { $Window.Icon = [Windows.Media.Imaging.BitmapFrame]::Create([Uri](Join-Path
 $script:BrushConv = New-Object Windows.Media.BrushConverter
 function Get-Brush([string]$Hex) { $script:BrushConv.ConvertFromString($Hex) }
 $script:StatusColor = @{ OK = '#3DDC84'; Warn = '#FFB020'; Crit = '#FF2A3D'; Info = '#6EA8FE'; NA = '#6B5B5F' }
-$script:StatusText = @{ OK = 'OK'; Warn = 'À surveiller'; Crit = 'Problème'; Info = 'Info'; NA = 'N/D' }
+$script:StatusText = @{}   # rempli par Update-UiLanguage
 
 #endregion
 
 #region Pages ---------------------------------------------------------------------------
 
 $script:Pages = [ordered]@{
-    Dashboard   = @{ Nav = 'NavDashboard';   Title = 'Tableau de bord'; Fn = 'Invoke-DashboardDiagnostic'; Desc = 'Vue rapide de l''état du PC et des points d''attention. Environ 10 secondes, lecture seule.' }
-    Hardware    = @{ Nav = 'NavHardware';    Title = 'Matériel';        Fn = 'Invoke-HardwareDiagnostic';  Desc = 'Processeur, mémoire, carte graphique, BIOS et températures (uniquement celles réellement exposées par le matériel).' }
-    Network     = @{ Nav = 'NavNetwork';     Title = 'Réseau';          Fn = 'Invoke-NetworkDiagnostic';   Desc = 'Connexion, DNS et DoH, latence, gigue et pertes vers la box et Internet, rapidité DNS.'; Opt = 'OptNetwork' }
-    Windows     = @{ Nav = 'NavWindows';     Title = 'Windows';         Fn = 'Invoke-WindowsDiagnostic';   Desc = 'Version et support, stabilité, journaux d''erreurs, services, programmes au démarrage et sécurité.'; Opt = 'OptWindows' }
-    Storage     = @{ Nav = 'NavStorage';     Title = 'Stockage';        Fn = 'Invoke-StorageDiagnostic';   Desc = 'Espace libre, santé des disques, dossiers volumineux et recherche de gros fichiers. Rien n''est supprimé.'; Opt = 'OptStorage' }
-    Audio       = @{ Nav = 'NavAudio';       Title = 'Audio';           Fn = 'Invoke-AudioDiagnostic';     Desc = 'Votre sortie et votre micro par défaut (carte son, USB, Bluetooth, HDMI…) : connexion, pilote, fréquences d''échantillonnage, ASIO, latence indicative.' }
-    Maintenance = @{ Nav = 'NavMaintenance'; Title = 'Maintenance';     Custom = $true;                    Desc = 'Vérifications et nettoyage contrôlé. Chaque action qui modifie le système demande votre confirmation.' }
-    Startup     = @{ Nav = 'NavStartup';     Title = 'Démarrage';       Custom = $true;                    Desc = 'Programmes lancés avec Windows. Désactiver n''en supprime aucun : vous pouvez les réactiver à tout moment.' }
-    Perf        = @{ Nav = 'NavPerf';        Title = 'Mode Performance'; Custom = $true;                   Desc = 'Presets 1-clic (Jeu, MAO, Bureautique) ou Mode Performance manuel : plan d''alimentation, services secondaires, cache RAM, fichiers temporaires. Tout se remet en un clic.' }
-    Security    = @{ Nav = 'NavSecurity';    Title = 'Security Guard';  Custom = $true;                    Desc = 'Audit de sécurité léger (ce n''est pas un antivirus) : Defender, pare-feu, programmes suspects au démarrage, scan de fichiers. Les éléments douteux sont isolés en quarantaine, jamais supprimés.' }
-    Bilan       = @{ Nav = 'NavBilan';       Title = 'Bilan avant/après'; Custom = $true;                  Desc = 'Chaque nettoyage lancé depuis Maintenance, et chaque activation du Mode Performance, est mesuré automatiquement : espace libéré, RAM, services actifs, fichiers temporaires et périphériques audio fantômes.' }
-    History     = @{ Nav = 'NavHistory';    Title = 'Historique';      Custom = $true;                    Desc = 'Diagnostics précédents : réouverture, comparaison et export HTML.' }
+    Dashboard   = @{ Nav = 'NavDashboard';   Fn = 'Invoke-DashboardDiagnostic' }
+    Hardware    = @{ Nav = 'NavHardware';    Fn = 'Invoke-HardwareDiagnostic' }
+    Network     = @{ Nav = 'NavNetwork';     Fn = 'Invoke-NetworkDiagnostic';  Opt = 'OptNetwork' }
+    Windows     = @{ Nav = 'NavWindows';     Fn = 'Invoke-WindowsDiagnostic';  Opt = 'OptWindows' }
+    Storage     = @{ Nav = 'NavStorage';     Fn = 'Invoke-StorageDiagnostic';  Opt = 'OptStorage' }
+    Audio       = @{ Nav = 'NavAudio';       Fn = 'Invoke-AudioDiagnostic' }
+    Maintenance = @{ Nav = 'NavMaintenance'; Custom = $true }
+    Startup     = @{ Nav = 'NavStartup';     Custom = $true }
+    Perf        = @{ Nav = 'NavPerf';        Custom = $true }
+    Security    = @{ Nav = 'NavSecurity';    Custom = $true }
+    Bilan       = @{ Nav = 'NavBilan';       Custom = $true }
+    History     = @{ Nav = 'NavHistory';     Custom = $true }
+}
+# Titre (clé Nav.<Page>) et description (clé Page.<Page>.Desc) : posés par Update-UiLanguage dans la langue courante
+function Update-PageTexts {
+    foreach ($k in @($script:Pages.Keys)) {
+        $script:Pages[$k].Title = Get-Text "Nav.$k"
+        $script:Pages[$k].Desc = Get-Text "Page.$k.Desc"
+    }
 }
 $script:CurrentPage = 'Dashboard'
 $script:Results = @{}          # dernier résultat affiché par page
@@ -109,7 +114,8 @@ function Start-BackgroundJob {
         Le contexte $ctx (hashtable synchronisée) transporte progression, statut et demande d'annulation.
         $OnComplete reçoit (sortie, erreurs) sur le thread de l'interface.
     #>
-    param([string]$Function, [hashtable]$Params = @{}, [scriptblock]$OnComplete, [string]$StartText = 'Démarrage…', [switch]$Baseline)
+    param([string]$Function, [hashtable]$Params = @{}, [scriptblock]$OnComplete, [string]$StartText = '', [switch]$Baseline)
+    if (-not $StartText) { $StartText = Get-Text 'Msg.Starting' }
     if ($script:Job) { return }
     $ctx = [hashtable]::Synchronized(@{ Progress = 0; Status = $StartText; Cancel = $false })
     $rs = [runspacefactory]::CreateRunspace()
@@ -137,7 +143,7 @@ $script:Timer.Add_Tick({
     $j = $script:Job
     if (-not $j) { $script:Timer.Stop(); return }
     if ($j.Ctx.Progress -ne $script:LastProgress) { $script:LastProgress = $j.Ctx.Progress; Set-SmoothValue $UI.Progress $j.Ctx.Progress 320 }
-    $UI.TxtStatus.Text = if ($j.Ctx.Cancel) { 'Annulation… (les résultats partiels seront affichés)' } else { '{0} · {1}' -f $j.Label, $j.Ctx.Status }
+    $UI.TxtStatus.Text = if ($j.Ctx.Cancel) { Get-Text 'Msg.Cancelling' } else { '{0} · {1}' -f $j.Label, $j.Ctx.Status }
     if (-not $j.Handle.IsCompleted) { return }
 
     $script:Timer.Stop()
@@ -152,7 +158,7 @@ $script:Timer.Add_Tick({
     $script:Job = $null
     Set-Busy $false
     try { & $j.OnComplete $out $errs }
-    catch { Show-Message "Erreur d'affichage : $($_.Exception.Message)" 'Erreur' 'Error' }
+    catch { Show-Message (Get-Text 'Msg.DisplayError' $_.Exception.Message) (Get-Text 'Ui.Error') 'Error' }
 })
 
 function Set-Busy([bool]$Busy, [string]$Text = '') {
@@ -314,7 +320,7 @@ function Show-Placeholder([string]$Text) {
     $ic = New-Text ([string][char]0xE9D9) 30 '#FF2A3D'; $ic.FontFamily = 'Segoe Fluent Icons, Segoe MDL2 Assets'; $ic.Margin = '0,4,0,10'
     [void]$sp.Children.Add($ic)
     [void]$sp.Children.Add((New-Text $Text 14 '#C9B8BC' -Wrap))
-    [void]$sp.Children.Add((New-Text 'Toutes les analyses sont en lecture seule : rien n''est modifié sur le PC.' 12 '#7E6C71'))
+    [void]$sp.Children.Add((New-Text (Get-Text 'Msg.ReadOnlyNote') 12 '#7E6C71'))
     $c.Child = $sp; $c.Padding = '24,20'
     [void]$UI.ResultsPanel.Children.Add($c)
 }
@@ -349,8 +355,8 @@ function Set-Page([string]$Page) {
         'Bilan' { Show-BilanPage }
         'History' { Show-HistoryPage }
         default {
-            if ($script:Results[$Page]) { Show-DiagResult $script:Results[$Page]; $UI.TxtRun.Text = 'Relancer' }
-            else { Show-Placeholder "Aucun diagnostic « $($p.Title) » pour cette session. Cliquez sur « Lancer le diagnostic »."; $UI.TxtRun.Text = 'Lancer le diagnostic' }
+            if ($script:Results[$Page]) { Show-DiagResult $script:Results[$Page]; $UI.TxtRun.Text = Get-Text 'Ui.Rerun' }
+            else { Show-Placeholder (Get-Text 'Msg.NoDiag' $p.Title); $UI.TxtRun.Text = Get-Text 'Ui.Run' }
         }
     }
     $UI.BtnExport.IsEnabled = [bool](Get-CurrentResult) -or ($Page -eq 'History')
@@ -371,21 +377,21 @@ function Invoke-PageDiagnostic {
     $page = $script:CurrentPage
     $p = $script:Pages[$page]
     if ($p.Custom) { return }
-    if ($page -eq 'Storage' -and -not (Test-Path -LiteralPath $UI.TxtScanPath.Text)) { Show-Message 'Le dossier à analyser est introuvable.' 'Stockage' 'Warning'; return }
-    Start-BackgroundJob -Function $p.Fn -Params (Get-PageParams $page) -StartText "Diagnostic $($p.Title.ToLower()) en cours…" -Baseline -OnComplete {
+    if ($page -eq 'Storage' -and -not (Test-Path -LiteralPath $UI.TxtScanPath.Text)) { Show-Message (Get-Text 'Msg.FolderMissing') $p.Title 'Warning'; return }
+    Start-BackgroundJob -Function $p.Fn -Params (Get-PageParams $page) -StartText (Get-Text 'Msg.DiagRunning' $p.Title.ToLower()) -Baseline -OnComplete {
         param($out, $errs)
         $base = @($out) | Where-Object { $_ -and $_.PSObject.Properties['DiskFreeBytes'] } | Select-Object -First 1
         if ($base) { Set-BilanBaseline $base }
         $res = @($out) | Where-Object { $_ -and $_.PSObject.Properties['Sections'] } | Select-Object -Last 1
         if (-not $res) {
-            Show-Message ("Le diagnostic n'a pas pu aboutir.`n`n" + (($errs | Select-Object -First 3) -join "`n")) 'Erreur' 'Error'
+            Show-Message ((Get-Text 'Msg.DiagFailed') + "`n`n" + (($errs | Select-Object -First 3) -join "`n")) (Get-Text 'Ui.Error') 'Error'
             return
         }
         $script:Results[$res.Module] = $res
         try { [void](Save-DiagHistory $res) } catch { Write-AppLog "Historique : $($_.Exception.Message)" 'ERROR' }
-        if ($script:CurrentPage -eq $res.Module -and -not $script:ViewedHistory) { Show-DiagResult $res; $UI.TxtRun.Text = 'Relancer' }
+        if ($script:CurrentPage -eq $res.Module -and -not $script:ViewedHistory) { Show-DiagResult $res; $UI.TxtRun.Text = Get-Text 'Ui.Rerun' }
         $UI.BtnExport.IsEnabled = $true
-        if ($errs) { $UI.TxtStatus.Text = "$(@($errs).Count) avertissement(s) technique(s) : voir Data\Logs" }
+        if ($errs) { $UI.TxtStatus.Text = Get-Text 'Msg.TechWarnings' (@($errs).Count) }
     }
 }
 
@@ -393,7 +399,8 @@ function Invoke-PageDiagnostic {
 
 #region Page Maintenance ---------------------------------------------------------------
 
-function Confirm-Action([string]$Text, [string]$Title = 'Confirmation') {
+function Confirm-Action([string]$Text, [string]$Title = '') {
+    if (-not $Title) { $Title = Get-Text 'Ui.Confirmation' }
     (Show-Message $Text $Title 'Warning' 'YesNo') -eq 'Yes'
 }
 
@@ -1348,11 +1355,11 @@ function Update-LiveGauges {
         }
         $script:PrevCpuTimes = $t
         $m = [PCToolkit.Sys]::Memory()
-        Set-Gauge $UI.GaugeRam $UI.TxtGaugeRam $m[0] ('{0:N0} % · {1:N1} / {2:N0} Go' -f $m[0], (($m[1] - $m[2]) / 1GB), ($m[1] / 1GB))
+        Set-Gauge $UI.GaugeRam $UI.TxtGaugeRam $m[0] (Get-Text 'Gauge.RamFmt' $m[0] (($m[1] - $m[2]) / 1GB) ($m[1] / 1GB))
         $d = [IO.DriveInfo]$env:SystemDrive
         $usedPct = [math]::Round(100 * (1 - $d.AvailableFreeSpace / $d.TotalSize))
-        $UI.LblGaugeDisk.Text = "DISQUE $($env:SystemDrive)"
-        Set-Gauge $UI.GaugeDisk $UI.TxtGaugeDisk $usedPct ('{0} % · {1} libres' -f $usedPct, (Format-Bytes $d.AvailableFreeSpace))
+        $UI.LblGaugeDisk.Text = Get-Text 'Gauge.Disk' $env:SystemDrive
+        Set-Gauge $UI.GaugeDisk $UI.TxtGaugeDisk $usedPct (Get-Text 'Gauge.DiskFmt' $usedPct (Format-Bytes $d.AvailableFreeSpace))
     } catch { }
 }
 
@@ -1411,28 +1418,67 @@ foreach ($k in $script:Pages.Keys) {
         $pg = ($script:Pages.GetEnumerator() | Where-Object { $_.Value.Nav -eq $s.Name } | Select-Object -First 1).Key
         if ($pg) {
             try { Set-Page $pg }
-            catch { Write-AppLog "Navigation [$pg] : $($_.Exception.Message)" 'ERROR'; Show-Message "Impossible d'afficher la page : $($_.Exception.Message)" 'Erreur' 'Error' }
+            catch { Write-AppLog "Navigation [$pg] : $($_.Exception.Message)" 'ERROR'; Show-Message (Get-Text 'Msg.PageError' $_.Exception.Message) (Get-Text 'Ui.Error') 'Error' }
         }
     })
 }
 
+function Update-UiLanguage {
+    <# Applique la langue courante à tous les textes fixes de la fenêtre, puis ré-affiche la page. #>
+    param([switch]$NoRefresh)
+    $Window.Title = Get-Text 'App.Title' $AppVersion
+    $UI.TxtSubtitle.Text = Get-Text 'App.Subtitle'
+    $UI.TxtVersion.Text = Get-Text 'App.VersionLine' $AppVersion
+    $UI.LblLang.Text = Get-Text 'Ui.Lang'
+    $UI.LblDiag.Text = Get-Text 'Nav.Diag'
+    $UI.LblTools.Text = Get-Text 'Nav.Tools'
+    foreach ($k in @($script:Pages.Keys)) { $UI[$script:Pages[$k].Nav].Content = Get-Text "Nav.$k" }
+    $UI.TxtElevate.Text = Get-Text 'Ui.Elevate'
+    $UI.BtnElevate.ToolTip = Get-Text 'Ui.ElevateTip'
+    $UI.TxtAdmin.Text = if ($isAdmin) { Get-Text 'Ui.AdminOn' } else { Get-Text 'Ui.AdminOff' }
+    $UI.TxtBack.Text = Get-Text 'Ui.Back'
+    $UI.TxtCancel.Text = Get-Text 'Ui.Cancel'
+    $UI.BtnExport.ToolTip = Get-Text 'Ui.ExportHtmlTip'
+    $UI.BtnExportTxt.ToolTip = Get-Text 'Ui.ExportTxtTip'
+    $UI.ChkNotepad.Content = Get-Text 'Ui.OpenNotepad'
+    $UI.LblGaugeCpu.Text = Get-Text 'Gauge.Cpu'
+    $UI.LblGaugeRam.Text = Get-Text 'Gauge.Ram'
+    $UI.LblGaugeDisk.Text = Get-Text 'Gauge.Disk' $env:SystemDrive
+    $UI.LblPing.Text = Get-Text 'Opt.Ping'
+    $UI.LblDays.Text = Get-Text 'Opt.Days'
+    $UI.Days7.Content = Get-Text 'Opt.Days7'
+    $UI.Days30.Content = Get-Text 'Opt.Days30'
+    $UI.LblFolder.Text = Get-Text 'Opt.Folder'
+    $UI.BtnBrowse.Content = Get-Text 'Opt.Browse'
+    $UI.LblBig.Text = Get-Text 'Opt.Big'
+    $UI.Big100.Content = Get-Text 'Opt.Big100'
+    $UI.Big500.Content = Get-Text 'Opt.Big500'
+    $UI.Big2000.Content = Get-Text 'Opt.Big2000'
+    $UI.BtnLogClear.Content = Get-Text 'Ui.LogClear'
+    $UI.BtnLogToggle.Content = if ($UI.LogBox.Visibility -eq 'Visible') { Get-Text 'Ui.LogCollapse' } else { Get-Text 'Ui.LogExpand' }
+    $script:StatusText = @{}
+    foreach ($s in 'OK', 'Warn', 'Crit', 'Info', 'NA') { $script:StatusText[$s] = Get-Text "Status.$s" }
+    Update-PageTexts
+    if (-not $NoRefresh) { Set-Page $script:CurrentPage }
+}
+
 $UI.BtnRun.Add_Click({ Invoke-PageDiagnostic })
-$UI.BtnCancel.Add_Click({ if ($script:Job) { $script:Job.Ctx.Cancel = $true; $UI.TxtStatus.Text = 'Annulation… (les résultats partiels seront affichés)' } })
+$UI.BtnCancel.Add_Click({ if ($script:Job) { $script:Job.Ctx.Cancel = $true; $UI.TxtStatus.Text = Get-Text 'Msg.Cancelling' } })
 $UI.BtnBack.Add_Click({ Set-Page 'History' })
 $UI.BtnExport.Add_Click({ Export-CurrentPage 'Html' })
 $UI.BtnExportTxt.Add_Click({ Export-CurrentPage 'Txt' })
 $UI.BtnBrowse.Add_Click({
     $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
-    $dlg.Description = 'Dossier dans lequel chercher les gros fichiers'
+    $dlg.Description = Get-Text 'Opt.BrowseDesc'
     $dlg.SelectedPath = $UI.TxtScanPath.Text
     if ($dlg.ShowDialog() -eq 'OK') { $UI.TxtScanPath.Text = $dlg.SelectedPath }
 })
 $UI.BtnElevate.Add_Click({
-    if (-not (Confirm-Action "Relancer PC Toolkit avec les droits administrateur ?`n`nWindows va demander l'autorisation. Les diagnostics restent en lecture seule ; les droits servent uniquement à lire davantage d'informations (SMART, températures disque, Temp Windows)." 'Mode administrateur')) { return }
+    if (-not (Confirm-Action (Get-Text 'Elevate.Confirm') (Get-Text 'Ui.AdminOn'))) { return }
     try {
         Start-Process powershell.exe -Verb RunAs -WindowStyle Hidden -ArgumentList '-NoProfile', '-ExecutionPolicy', 'Bypass', '-STA', '-File', "`"$script:ScriptPath`""
         $Window.Close()
-    } catch { Show-Message 'Relance annulée.' 'Mode administrateur' }
+    } catch { Show-Message (Get-Text 'Elevate.Cancelled') (Get-Text 'Ui.AdminOn') }
 })
 
 $Window.Add_SourceInitialized({
@@ -1449,7 +1495,7 @@ $Window.Add_Closing({ if ($script:Job) { $script:Job.Ctx.Cancel = $true; try { $
 $Window.Dispatcher.Add_UnhandledException({
     param($s, $e)
     Write-AppLog "Interface : $($e.Exception.Message)" 'ERROR'
-    Show-Message "Une erreur inattendue s'est produite :`n$($e.Exception.Message)`n`nElle a été enregistrée dans Data\Logs." 'Erreur' 'Error'
+    Show-Message (Get-Text 'Msg.UnhandledError' $e.Exception.Message) (Get-Text 'Ui.Error') 'Error'
     $e.Handled = $true
 })
 
@@ -1458,7 +1504,6 @@ $Window.Dispatcher.Add_UnhandledException({
 #region Démarrage ------------------------------------------------------------------------
 
 $isAdmin = Test-IsAdmin
-$UI.TxtAdmin.Text = if ($isAdmin) { 'Mode administrateur' } else { 'Mode standard' }
 $UI.AdminIcon.Foreground = Get-Brush $(if ($isAdmin) { '#FFB020' } else { '#3DDC84' })
 if ($isAdmin) { $UI.BtnElevate.Visibility = 'Collapsed' }
 $UI.TxtScanPath.Text = $env:USERPROFILE
@@ -1473,10 +1518,25 @@ $UI.BtnLogClear.Add_Click({ $UI.LogBox.Document.Blocks.Clear() })
 $UI.BtnLogToggle.Add_Click({
     $open = $UI.LogBox.Visibility -eq 'Visible'
     $UI.LogBox.Visibility = if ($open) { 'Collapsed' } else { 'Visible' }
-    $UI.BtnLogToggle.Content = if ($open) { 'Agrandir' } else { 'Réduire' }
+    $UI.BtnLogToggle.Content = if ($open) { Get-Text 'Ui.LogExpand' } else { Get-Text 'Ui.LogCollapse' }
 })
 Update-LogConsole
 $script:UiTimer.Start()
+
+# Sélecteur de langue FR / EN : changement à chaud (réglage mémorisé dans Data\language.json)
+if ((Get-AppLanguage) -eq 'en') { $UI.LangEn.IsChecked = $true } else { $UI.LangFr.IsChecked = $true }
+foreach ($pair in @(@('LangFr', 'fr'), @('LangEn', 'en'))) {
+    $code = $pair[1]
+    $UI[$pair[0]].Add_Checked({
+        param($s, $e)
+        $c = if ($s.Name -eq 'LangEn') { 'en' } else { 'fr' }
+        if ($c -eq (Get-AppLanguage)) { return }
+        [void](Set-AppLanguage $c)
+        Write-AppLog "Language: $c"
+        try { Update-UiLanguage } catch { Write-AppLog "Langue : $($_.Exception.Message)" 'ERROR' }
+    })
+}
+Update-UiLanguage -NoRefresh
 Set-Page 'Dashboard'
 
 if ($Snapshot) {
