@@ -4,12 +4,12 @@
 
 [![CI](https://github.com/TxF-AI/PC-Toolkit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/TxF-AI/PC-Toolkit/actions/workflows/ci.yml)
 ![Version](https://img.shields.io/badge/version-v1.5.0-FF2A4D)
-![Tests Pester](https://img.shields.io/badge/tests%20Pester-149%2F149%20passing-brightgreen)
+![Tests Pester](https://img.shields.io/badge/tests%20Pester-165%2F165%20passing-brightgreen)
 ![Licence](https://img.shields.io/badge/licence-MIT-22E5FF)
 ![Compatibilité](https://img.shields.io/badge/PowerShell-5.1%2B%20%7C%20Windows%2010%20%26%2011-blue)
 
 Boîte à outils de diagnostic et d'optimisation pour Windows 10/11 : matériel, réseau, Windows, stockage, audio, maintenance et sécurité.
-Interface sombre au rouge néon et cyan, en français. **Aucun logiciel à installer** : Windows suffit. Rien n'est envoyé sur Internet.
+Interface sombre au rouge néon et cyan, **en français ou en anglais** (sélecteur FR / EN dans la barre latérale, appliqué à chaud ; par défaut la langue de Windows). **Aucun logiciel à installer** : Windows suffit. Rien n'est envoyé sur Internet.
 
 ## Points forts
 
@@ -125,7 +125,8 @@ PC Toolkit\
 ├─ LICENSE                    licence MIT
 ├─ app.ico                    icône
 ├─ UI\MainWindow.xaml         design de l'interface
-├─ Modules\*.psm1             un module par diagnostic + Core (base commune)
+├─ Modules\*.psm1             un module par diagnostic + Core (base commune) + I18n (langues)
+├─ Lang\fr.psd1, en.psd1      textes de l'interface, français et anglais
 ├─ Data\                      historique et journaux (créé à l'utilisation)
 └─ Reports\                   rapports HTML et TXT exportés (créé à l'utilisation)
 ```
@@ -152,7 +153,7 @@ Le code de sortie est le nombre de tests en échec (`0` = tout est bon). Le zip 
 PC Toolkit est développé en **binôme humain / IA** :
 
 - **Direction du projet (TxF-AI)** : cahier des charges de chaque version, choix d'architecture (interface WPF, un module PowerShell par page, jobs en arrière-plan), règles de sécurité non négociables (diagnostics en lecture seule, aperçu puis confirmation avant toute modification, sauvegarde et restauration, aucune mesure inventée, aucune dépendance), relecture et validation des résultats, tests sur de vrais PC, mise en place du CI/CD et de la publication.
-- **Assistant de développement (Claude Code, Anthropic)** : utilisé comme *Senior Pair Programmer* pour prototyper vite et écrire la majeure partie du code, de la suite de **149 tests Pester** et de la documentation, sous cette direction et ces garde-fous.
+- **Assistant de développement (Claude Code, Anthropic)** : utilisé comme *Senior Pair Programmer* pour prototyper vite et écrire la majeure partie du code, de la suite de **165 tests Pester** et de la documentation, sous cette direction et ces garde-fous.
 
 Cette façon de travailler est un choix assumé : chaque changement passe par la suite de tests (`Run-Tests.ps1`), par la CI GitHub Actions et, pour les actions système, par un essai réel en administrateur avant livraison.
 

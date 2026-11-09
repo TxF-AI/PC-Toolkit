@@ -4,12 +4,12 @@
 
 [![CI](https://github.com/TxF-AI/PC-Toolkit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/TxF-AI/PC-Toolkit/actions/workflows/ci.yml)
 ![Version](https://img.shields.io/badge/version-v1.5.0-FF2A4D)
-![Pester tests](https://img.shields.io/badge/Pester%20tests-149%2F149%20passing-brightgreen)
+![Pester tests](https://img.shields.io/badge/Pester%20tests-165%2F165%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-22E5FF)
 ![Compatibility](https://img.shields.io/badge/PowerShell-5.1%2B%20%7C%20Windows%2010%20%26%2011-blue)
 
 A diagnostics and optimization toolbox for Windows 10/11: hardware, network, Windows, storage, audio, maintenance and security.
-Dark interface with neon red and cyan accents. **The interface is in French** (the documentation is also available in English). **Nothing to install**: Windows is enough. Nothing is sent over the Internet.
+Dark interface with neon red and cyan accents. **The interface is available in English and French** (FR / EN switch in the sidebar, applied live; the default follows your Windows language). **Nothing to install**: Windows is enough. Nothing is sent over the Internet.
 
 ## Highlights
 
@@ -71,7 +71,7 @@ Both strings of digits and letters must be identical. Otherwise the file was mod
 
 ## What the app does
 
-The interface is in French; page names are shown below with their French label.
+Page names below are the English labels; switch to French with the **FR / EN** selector at the bottom of the sidebar. Reports (HTML / TXT) follow the language selected at export time. Results already saved in the history stay in the language they were produced in, and Windows event-log messages are shown in your Windows language.
 
 | Page | Content |
 |---|---|
@@ -103,7 +103,7 @@ The tool resets Windows' **SRUM** database: per-app data usage, the Task Manager
 - **Diagnostics change nothing**: they only read.
 - Every maintenance action explains what it will do and waits for your **Yes** before acting.
 - System tools (SFC, DISM, CHKDSK) open in a visible window, after Windows authorization.
-- No measurement is invented: what Windows does not expose shows "Non disponible" (Not available).
+- No measurement is invented: what Windows does not expose shows "Not available" ("Non disponible" in French).
 - Nothing is sent over the Internet, apart from the pings and DNS queries of the network test.
 - **Security Guard never deletes anything**: a suspicious file is moved to `Data\Quarantine` (restorable), a task or startup entry is only disabled. Its findings are clues, not verdicts; Windows Defender remains your protection.
 - The **Relaunch as administrator** button is optional: it only lets the app read more information (SMART health, disk temperatures).
@@ -127,8 +127,9 @@ PC Toolkit\
 ├─ LICENSE                    MIT license
 ├─ app.ico                    icon
 ├─ UI\MainWindow.xaml         interface design
-├─ Modules\*.psm1             one module per diagnostic + Core (shared base)
-├─ Data\                      history and logs (created on use)
+├─ Modules\*.psm1             one module per diagnostic + Core (shared base) + I18n (languages)
+├─ Lang\fr.psd1, en.psd1      interface texts, French and English
+├─ Data\                      history, logs and language choice (created on use)
 └─ Reports\                   exported HTML and TXT reports (created on use)
 ```
 
@@ -154,7 +155,7 @@ The exit code is the number of failing tests (`0` = all good). The distribution 
 PC Toolkit is developed as a **human / AI pair**:
 
 - **Project direction (TxF-AI)**: the specification of each version, architecture choices (WPF interface, one PowerShell module per page, background jobs), non-negotiable safety rules (read-only diagnostics, preview then confirmation before any change, backup and restore, no invented measurement, no dependency), review and validation of the results, tests on real PCs, CI/CD and release setup.
-- **Development assistant (Claude Code, Anthropic)**: used as a *Senior Pair Programmer* to prototype fast and write most of the code, the **149 Pester tests** and the documentation, under that direction and those guardrails.
+- **Development assistant (Claude Code, Anthropic)**: used as a *Senior Pair Programmer* to prototype fast and write most of the code, the **165 Pester tests** and the documentation, under that direction and those guardrails.
 
 This way of working is a deliberate choice: every change goes through the test suite (`Run-Tests.ps1`), through the GitHub Actions CI and, for system actions, through a real test as administrator before delivery.
 

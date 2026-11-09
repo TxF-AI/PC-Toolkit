@@ -36,9 +36,9 @@ I wanted one place to see what is going on with my Windows PC (hardware, network
 - **1-click presets: Game / Audio production (DAW) / Office**: power plan, temporary stop of secondary services, RAM cache, temp files, startup — with preview, confirmation and a **one-click "restore initial state"**. The audio preset never touches audio services.
 - **Security Guard**: a *light* audit (Defender, firewall, UAC), suspicious startup entries / scheduled tasks, file or folder scan, **restorable quarantine** (nothing is ever deleted). It is **not an antivirus**: Windows Defender remains your protection.
 - **Before/after report on 11 indicators** (freed space, RAM, services, startup programs, temp files, ghost audio devices, ...), exportable as HTML/TXT.
-- UI in French, neon red/cyan theme, built-in console that shows what the app does in real time.
+- UI in French or English (FR/EN switch, applied live), neon red/cyan theme, built-in console that shows what the app does in real time.
 
-**Quality**: 149 Pester tests, MIT licensed. The release zip is not code-signed, so SmartScreen will warn; compare the hash.
+**Quality**: 165 Pester tests, MIT licensed. The release zip is not code-signed, so SmartScreen will warn; compare the hash.
 
 **Download / verify**
 https://github.com/TxF-AI/PC-Toolkit/releases/tag/v1.5.0
@@ -61,17 +61,17 @@ It was built with an AI pair programmer under strict rules (documented in the RE
 
 Hi HN, author here.
 
-PC Toolkit is a Windows 10/11 diagnostics and tuning toolbox written in Windows PowerShell 5.1 with a WPF UI (French, dark neon theme). I wrote it because most "optimizer" tools either do too much silently or need an installer, and I wanted something I could read in an evening.
+PC Toolkit is a Windows 10/11 diagnostics and tuning toolbox written in Windows PowerShell 5.1 with a WPF UI (French or English, dark neon theme). I wrote it because most "optimizer" tools either do too much silently or need an installer, and I wanted something I could read in an evening.
 
 Design choices:
 - **Read-only by default.** Diagnostics only read. Every action that changes the system goes through preview → explicit confirmation (`-Confirmed`) → log entry, and the presets (Game / Audio / Office) store the previous state so "restore initial state" is one click.
 - **Honesty about measurements.** If Windows doesn't expose a value, the UI says "Non disponible" instead of guessing. A before/after report measures 11 indicators around each cleanup so you can see what actually changed.
 - **Security Guard is an audit, not an antivirus.** It looks at Defender / firewall / UAC state, suspicious startup entries and tasks, and can scan a file or folder (signature, SHA-256 against a known-files list, known malicious script patterns). Suspicious items are quarantined (restorable), never deleted.
 - **No dependency, nothing sent online.** PowerShell + WPF only; the UI runs jobs in runspaces with a synchronized hashtable for progress/cancel.
-- **Tests**: 149 Pester tests (Pester 3.4 syntax on stock Windows), including UTF-8 BOM and syntax checks on every script.
+- **Tests**: 165 Pester tests (Pester 3.4 syntax on stock Windows), including UTF-8 BOM and syntax checks on every script.
 - A funny lesson: a function named like a persistence scanner made antivirus flag the source file itself, so detection functions have neutral names.
 
-Caveats: UI is French only for now, the zip is unsigned (SmartScreen; SHA-256 in the release), and it was written with an AI pair programmer under explicit rules (the README says so).
+Caveats: the UI is bilingual FR/EN (Windows event-log messages stay in your Windows language), the zip is unsigned (SmartScreen; SHA-256 in the release), and it was written with an AI pair programmer under explicit rules (the README says so).
 
 I'd love feedback on what a tool like this should refuse to touch.
 
@@ -97,7 +97,7 @@ Free, MIT 👉 github.com/TxF-AI/PC-Toolkit
 
 **X (thread, 2ᵉ tweet)**
 ```
-Rules I set: diagnostics are read-only, every change = preview + confirmation + log, no dependency, nothing sent online, and "Non disponible" instead of invented numbers. 149 Pester tests. It's NOT an antivirus. Feedback welcome 🙏
+Rules I set: diagnostics are read-only, every change = preview + confirmation + log, no dependency, nothing sent online, and "Non disponible" instead of invented numbers. 165 Pester tests. It's NOT an antivirus. Feedback welcome 🙏
 ```
 
 **LinkedIn (FR)**
@@ -113,7 +113,7 @@ PC//TOOLKIT (v1.5.0), en PowerShell 5.1 + WPF :
 🛡️ Security Guard : audit léger et quarantaine restaurable (ce n'est pas un antivirus)
 📊 bilan avant/après sur 11 indicateurs, exportable en HTML/TXT
 
-Règles du produit : aucune mesure inventée (« Non disponible »), aucune dépendance, rien n'est envoyé sur Internet, 149 tests Pester, licence MIT. Développé avec un assistant IA sous des règles strictes, documentées dans le README.
+Règles du produit : aucune mesure inventée (« Non disponible »), aucune dépendance, rien n'est envoyé sur Internet, 165 tests Pester, licence MIT. Développé avec un assistant IA sous des règles strictes, documentées dans le README.
 
 👉 https://github.com/TxF-AI/PC-Toolkit
 
@@ -124,7 +124,7 @@ Quels réglages un tel outil devrait-il ne jamais toucher ? Vos retours m'intér
 
 **LinkedIn (EN, variante courte)**
 ```
-Built a free Windows 10/11 toolbox in PowerShell + WPF: read-only diagnostics, reversible 1-click Game/DAW/Office presets, light security audit with restorable quarantine, before/after report. No dependency, nothing sent online, 149 tests, MIT.
+Built a free Windows 10/11 toolbox in PowerShell + WPF: read-only diagnostics, reversible 1-click Game/DAW/Office presets, light security audit with restorable quarantine, before/after report. No dependency, nothing sent online, 165 tests, MIT.
 github.com/TxF-AI/PC-Toolkit — feedback very welcome!
 #PowerShell #BuildInPublic #OpenSource
 ```
@@ -140,7 +140,7 @@ github.com/TxF-AI/PC-Toolkit — feedback very welcome!
 **Message (EN)**
 ```
 ⚡ **PC//TOOLKIT** — a free PowerShell 5.1 + WPF toolbox for Windows 10/11
-Read-only diagnostics (hardware, network, storage, audio, startup), reversible 1-click Game / DAW / Office presets, a *light* security audit with restorable quarantine (not an antivirus), and a before/after report. No dependency, nothing sent online, 149 Pester tests, MIT.
+Read-only diagnostics (hardware, network, storage, audio, startup), reversible 1-click Game / DAW / Office presets, a *light* security audit with restorable quarantine (not an antivirus), and a before/after report. No dependency, nothing sent online, 165 Pester tests, MIT.
 🔗 https://github.com/TxF-AI/PC-Toolkit
 Feedback welcome — especially on what the presets should never touch! 🙏
 ```
@@ -148,7 +148,7 @@ Feedback welcome — especially on what the presets should never touch! 🙏
 **Message (FR, DevFR)**
 ```
 ⚡ **PC//TOOLKIT** — boîte à outils Windows 10/11 en PowerShell 5.1 + WPF
-Diagnostics en lecture seule (matériel, réseau, stockage, audio, démarrage), presets 1-clic Jeu / MAO / Bureautique réversibles, audit de sécurité *léger* avec quarantaine restaurable (pas un antivirus) et bilan avant/après. Aucune dépendance, rien d'envoyé sur Internet, 149 tests Pester, MIT.
+Diagnostics en lecture seule (matériel, réseau, stockage, audio, démarrage), presets 1-clic Jeu / MAO / Bureautique réversibles, audit de sécurité *léger* avec quarantaine restaurable (pas un antivirus) et bilan avant/après. Aucune dépendance, rien d'envoyé sur Internet, 165 tests Pester, MIT.
 🔗 https://github.com/TxF-AI/PC-Toolkit
 Vos retours sont les bienvenus (notamment sur ce que les presets ne doivent jamais toucher) !
 ```
