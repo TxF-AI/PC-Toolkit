@@ -130,6 +130,15 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-Tests.ps1
 
 Le code de sortie est le nombre de tests en échec (`0` = tout est bon). Le zip de distribution ne contient pas les tests : ils sont dans le dépôt Git. Une intégration continue (GitHub Actions) les relance à chaque `push` et `pull_request` sur `main`.
 
+## Méthodologie & AI Pair Programming
+
+PC Toolkit est développé en **binôme humain / IA** :
+
+- **Direction du projet (TxF-AI)** : cahier des charges de chaque version, choix d'architecture (interface WPF, un module PowerShell par page, jobs en arrière-plan), règles de sécurité non négociables (diagnostics en lecture seule, aperçu puis confirmation avant toute modification, sauvegarde et restauration, aucune mesure inventée, aucune dépendance), relecture et validation des résultats, tests sur de vrais PC, mise en place du CI/CD et de la publication.
+- **Assistant de développement (Claude Code, Anthropic)** : utilisé comme *Senior Pair Programmer* pour prototyper vite et écrire la majeure partie du code, de la suite de **147 tests Pester** et de la documentation, sous cette direction et ces garde-fous.
+
+Cette façon de travailler est un choix assumé : chaque changement passe par la suite de tests (`Run-Tests.ps1`), par la CI GitHub Actions et, pour les actions système, par un essai réel en administrateur avant livraison.
+
 ## Contribuer
 
 Les contributions sont bienvenues : lisez [CONTRIBUTING.md](CONTRIBUTING.md) (règles du produit, pièges PowerShell 5.1, tests) puis ouvrez une issue avec les modèles *Signaler un bug* ou *Proposer une fonctionnalité*.
