@@ -421,7 +421,7 @@ Describe 'Demarrage et Mode Performance' {
         $src = Get-Content -LiteralPath (Join-Path $Root 'PCToolkit.ps1') -Raw -Encoding UTF8
         $src | Should Match "'Startup' \{ Show-StartupPage \}"
         $src | Should Match "'Perf' \{ Show-PerfPage \}"
-        $src | Should Match "Start-BilanCapture 'mode performance' -Force"
+        $src | Should Match "Start-BilanCapture \(Get-Text 'Ui\.\d+'\) -Force"   # libellé de l'opération : « mode performance »
         $src | Should Match 'Enable-GameMode -Confirmed'
         $src | Should Match 'Restore-GameMode -Confirmed'
         $src | Should Match 'Set-StartupEntryState -Entry \$Entry -Enabled \$enable -Confirmed'
@@ -529,7 +529,7 @@ Describe 'Nettoyage automatique du demarrage' {
         $src = Get-Content -LiteralPath (Join-Path $Root 'PCToolkit.ps1') -Raw -Encoding UTF8
         $src | Should Match 'Invoke-StartupAutoClean -Confirmed'
         $src | Should Match 'Restore-StartupBackup -Confirmed'
-        $src | Should Match "Start-BilanCapture 'nettoyage du démarrage' -Force"
+        $src | Should Match "Start-BilanCapture \(Get-Text 'Ui\.\d+'\) -Force"   # libellé de l'opération : « nettoyage du démarrage »
     }
 }
 
