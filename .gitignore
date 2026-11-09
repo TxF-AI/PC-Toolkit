@@ -5,4 +5,8 @@ Reports/
 graphify-out/
 # Zips fabriqués par Build-Zip.ps1
 *.zip
-*.zip.sha256.txtOutils/Sauvegardes/
+*.zip.sha256.txt
+
+# Sauvegardes du script de confidentialité
+Outils/Sauvegardes/
+
