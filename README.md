@@ -1,7 +1,21 @@
 # ⚡ PC//TOOLKIT — maintenance et diagnostic
 
-Boîte à outils de diagnostic pour Windows 11 : matériel, réseau, Windows, stockage, audio et maintenance.
-Interface sombre au rouge néon, en français. **Aucun logiciel à installer** : Windows suffit.
+![Version](https://img.shields.io/badge/version-v1.5.0-FF2A4D)
+![Tests Pester](https://img.shields.io/badge/tests%20Pester-143%2F143%20passing-brightgreen)
+![Licence](https://img.shields.io/badge/licence-MIT-22E5FF)
+![Compatibilité](https://img.shields.io/badge/PowerShell-5.1%2B%20%7C%20Windows%2010%20%26%2011-blue)
+
+Boîte à outils de diagnostic et d'optimisation pour Windows 10/11 : matériel, réseau, Windows, stockage, audio, maintenance et sécurité.
+Interface sombre au rouge néon et cyan, en français. **Aucun logiciel à installer** : Windows suffit. Rien n'est envoyé sur Internet.
+
+## Points forts
+
+- **Interface cyberpunk** : jauges CPU / RAM / disque C: en direct, lueurs néon, transitions et barres de progression animées, console de logs intégrée en bas de la fenêtre.
+- **Security Guard** : audit léger de Windows Defender, du pare-feu et de l'UAC ; recherche d'éléments suspects (démarrage, tâches planifiées, dossiers Temp/AppData) ; scan d'un fichier ou dossier ; **quarantaine restaurable**. Ce n'est **pas** un antivirus : Windows Defender reste votre protection.
+- **Presets 1-clic Jeu / MAO / Bureautique** : plan d'alimentation, services secondaires arrêtés temporairement, cache RAM, fichiers temporaires et démarrage, avec aperçu, confirmation et **restauration en un clic**. Le preset MAO garde la RAM intacte et ne touche jamais aux services audio.
+- **Nettoyage maîtrisé** : fichiers temporaires, corbeille, cache DNS, et nettoyage automatique du démarrage avec liste blanche (pilotes graphiques et audio, sécurité, anti-cheat) ; rien n'est supprimé, tout se restaure.
+- **Bilan avant/après sur 11 indicateurs** : espace libéré, RAM, services, processus, programmes au démarrage, fichiers temporaires, périphériques audio fantômes, éléments suspects actifs, menaces en quarantaine, profil d'optimisation… exportable en HTML et TXT.
+- **Sûr par conception** : diagnostics en lecture seule, aperçu puis confirmation avant toute modification, aucune mesure inventée (« Non disponible »), aucune dépendance.
 
 ## Démarrage rapide
 
@@ -18,9 +32,15 @@ L'installation copie l'application dans `%LocalAppData%\PCToolkit` et l'ajoute �
 Pour mettre à jour, relancez `Installer.cmd` depuis la nouvelle version : l'historique est conservé.
 La version installée s'affiche en bas de la barre latérale et dans chaque rapport.
 
-### Si Windows affiche un avertissement
-PC Toolkit n'est pas signé numériquement (un certificat coûte plusieurs centaines d'euros par an) : Windows le traite donc comme un fichier inconnu venant d'Internet ou de Discord. C'est normal.
+### Si Windows affiche un avertissement (SmartScreen)
+PC Toolkit n'est pas signé numériquement (un certificat coûte plusieurs centaines d'euros par an) : Windows le traite donc comme un fichier inconnu venant d'Internet. C'est normal.
 - **Avant d'extraire**, faites un clic droit sur le zip > **Propriétés** > cochez **Débloquer** > OK. Plus aucun avertissement ensuite.
+- Ou, en PowerShell, après l'extraction (ou sur le zip avant de l'extraire) :
+  ```powershell
+  Get-ChildItem -Path "C:\chemin\vers\PC Toolkit" -Recurse | Unblock-File
+  # ou, pour le zip seul :
+  Unblock-File -Path .\PC-Toolkit-v1.5.0.zip
+  ```
 - Si l'écran bleu « Windows a protégé votre ordinateur » apparaît : cliquez **Informations complémentaires** > **Exécuter quand même**.
 - Tout le code est lisible : ce sont des fichiers texte (`.ps1`, `.psm1`, `.xaml`) que vous pouvez ouvrir avec le Bloc-notes avant de lancer quoi que ce soit.
 
@@ -65,7 +85,7 @@ L'outil remet à zéro la base **SRUM** de Windows : la consommation de données
 - Les outils système (SFC, DISM, CHKDSK) s'ouvrent dans une fenêtre visible, après l'autorisation de Windows.
 - Aucune mesure n'est inventée : ce que Windows n'expose pas s'affiche « Non disponible ».
 - Rien n'est envoyé sur Internet, à part les pings et les requêtes DNS du test réseau.
-- **Security Guard ne supprime jamais rien** : un fichier suspect est déplacé dans `DataQuarantine` (restaurable), une tâche ou un démarrage est seulement désactivé. Ses constats sont des indices, pas des verdicts ; Windows Defender reste votre protection.
+- **Security Guard ne supprime jamais rien** : un fichier suspect est déplacé dans `Data\Quarantine` (restaurable), une tâche ou un démarrage est seulement désactivé. Ses constats sont des indices, pas des verdicts ; Windows Defender reste votre protection.
 - Le bouton **Relancer en administrateur** est facultatif : il permet seulement de lire plus d'informations (santé SMART, températures des disques).
 
 ## Désinstaller
@@ -84,6 +104,7 @@ PC Toolkit\
 ├─ PCToolkit.ps1              application (interface)
 ├─ VERSION                    numéro de version (seule source)
 ├─ CHANGELOG.md               nouveautés de chaque version
+├─ LICENSE                    licence MIT
 ├─ app.ico                    icône
 ├─ UI\MainWindow.xaml         design de l'interface
 ├─ Modules\*.psm1             un module par diagnostic + Core (base commune)
@@ -97,3 +118,21 @@ PC Toolkit\
   `powershell -ExecutionPolicy Bypass -NoProfile -File .\PCToolkit.ps1` pour voir le message d'erreur.
 - Les erreurs techniques sont enregistrées dans `Data\Logs`.
 - Configuration requise : Windows 10 ou 11, avec Windows PowerShell 5.1 (inclus dans Windows).
+
+## Lancer les tests
+
+La suite utilise Pester 3.4 (fourni avec Windows) ; depuis la racine du dépôt cloné :
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-Tests.ps1
+```
+
+Le code de sortie est le nombre de tests en échec (`0` = tout est bon). Le zip de distribution ne contient pas les tests : ils sont dans le dépôt Git. Une intégration continue (GitHub Actions) les relance à chaque `push` et `pull_request` sur `main`.
+
+## Contribuer
+
+Les contributions sont bienvenues : lisez [CONTRIBUTING.md](CONTRIBUTING.md) (règles du produit, pièges PowerShell 5.1, tests) puis ouvrez une issue avec les modèles *Signaler un bug* ou *Proposer une fonctionnalité*.
+
+## Licence
+
+[MIT](LICENSE) © 2026 TxF-AI. Fourni « tel quel », sans garantie : lisez l'aperçu de chaque action avant de confirmer.

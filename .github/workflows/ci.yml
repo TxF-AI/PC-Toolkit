@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests:
+    name: Tests Pester (Windows PowerShell 5.1)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vérifier Pester 3.x/4.x
+        shell: powershell
+        run: |
+          $m = Get-Module -ListAvailable Pester | Where-Object { $_.Version -lt [version]'5.0' } | Sort-Object Version -Descending | Select-Object -First 1
+          if (-not $m) {
+            Install-Module Pester -RequiredVersion 4.10.1 -Force -SkipPublisherCheck -Scope CurrentUser
+            $m = Get-Module -ListAvailable Pester | Where-Object { $_.Version -lt [version]'5.0' } | Select-Object -First 1
+          }
+          "Pester utilisé : $($m.Version)"
+
+      - name: Lancer les tests
+        shell: powershell
+        run: ./Run-Tests.ps1
