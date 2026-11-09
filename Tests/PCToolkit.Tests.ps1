@@ -2,7 +2,8 @@
 $Root = Split-Path $PSScriptRoot -Parent
 $ModDir = Join-Path $Root 'Modules'
 Get-ChildItem -LiteralPath $ModDir -Filter '*.psm1' | ForEach-Object { Import-Module $_.FullName -Force -DisableNameChecking }
-# Les tests comparent des textes français : langue forcée, sans toucher au réglage de l'utilisateur
+# Les tests comparent des textes français : langue forcée (aussi pour les processus enfants), sans toucher au réglage de l'utilisateur
+$env:PCTOOLKIT_LANG = 'fr'
 [void](Set-AppLanguage 'fr' -NoSave)
 
 Describe 'I18n' {
@@ -54,6 +55,32 @@ Describe 'I18n' {
         { Get-Text $null } | Should Not Throw
         { Get-Text 'Gauge.Disk' 1 2 3 } | Should Not Throw
         [void](Set-AppLanguage 'fr' -NoSave)
+    }
+    It 'aucune traduction anglaise ne contient de lettre accentuée (français oublié)' {
+        $bad = @($en.Keys | Where-Object { $en[$_] -match '[àâäçéèêëîïôöùûüœÀÉÈÊÎÔÙÛ]' })
+        ($bad -join ', ') | Should Be ''
+    }
+    It 'en anglais, les unités, les valeurs absentes et les exports sont en anglais' {
+        [void](Set-AppLanguage 'en' -NoSave)
+        try {
+            Format-Bytes (1.5GB) | Should Be ('{0:N1} GB' -f 1.5)
+            $r = New-DiagResult -Module 'Test' -Title 'T' -Ctx $null
+            Add-DiagSection $r 'S' -Body { param($s) Add-DiagItem $s 'Label' $null }
+            $r.Sections[0].Items[0].Value | Should Be 'Not available'
+            $txt = Get-Content -LiteralPath (Export-DiagText -Results @($r) -Path (Join-Path $TestDrive 'en.txt')) -Raw -Encoding UTF8
+            $txt | Should Match 'Legend:'
+            $txt | Should Not Match 'Non disponible'
+            $html = Get-Content -LiteralPath (Export-DiagHtml -Results @($r) -Path (Join-Path $TestDrive 'en.html')) -Raw -Encoding UTF8
+            $html | Should Match '<html lang="en">'
+            $html | Should Match 'Not available'
+        } finally { [void](Set-AppLanguage 'fr' -NoSave) }
+    }
+    It 'la variable PCTOOLKIT_LANG impose la langue d''un processus enfant' {
+        $ps = (Get-Command powershell.exe).Source
+        $code = "Import-Module '$(Join-Path $ModDir 'I18n.psm1')'; Get-Text 'Nav.Hardware'"
+        $env:PCTOOLKIT_LANG = 'en'
+        try { $out = & $ps -NoProfile -ExecutionPolicy Bypass -Command $code } finally { $env:PCTOOLKIT_LANG = 'fr' }
+        "$out".Trim() | Should Be 'Hardware'
     }
     It 'Set-AppLanguage refuse une langue inconnue' {
         Set-AppLanguage 'xx' -NoSave | Should Be $false

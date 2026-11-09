@@ -21,6 +21,8 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $src = $PSScriptRoot
+# Langue (FR / EN) : repli sur la clé si le module est absent
+try { Import-Module (Join-Path $PSScriptRoot 'Modules\I18n.psm1') -Force -DisableNameChecking } catch { function Get-Text { param([string]$Key) $Key } }
 $files = 'PCToolkit.ps1', 'app.ico', 'README.md', 'CHANGELOG.md', 'VERSION', 'Lancer PC Toolkit.cmd', 'Installer.cmd', 'Installer.ps1', 'Desinstaller.ps1'
 $version = try { (Get-Content -LiteralPath (Join-Path $src 'VERSION') -TotalCount 1).Trim() } catch { '0.0.0' }
 $dirs = 'Modules', 'UI', 'Lang'
@@ -29,17 +31,17 @@ $shortcutName = [string][char]0x26A1 + ' PC' + [char]0x2215 + [char]0x2215 + 'TO
 
 try {
     Write-Host ''
-    Write-Host '  ' -NoNewline; Write-Host "$([char]0x26A1) PC//TOOLKIT" -ForegroundColor Red -NoNewline; Write-Host " $version — installation"
+    Write-Host '  ' -NoNewline; Write-Host "$([char]0x26A1) PC//TOOLKIT" -ForegroundColor Red -NoNewline; Write-Host (Get-Text 'Ins.012' $version)
     Write-Host ''
 
     foreach ($x in @('PCToolkit.ps1', 'app.ico') + $dirs) {
-        if (-not (Test-Path -LiteralPath (Join-Path $src $x))) { throw "Fichier manquant : $x. Extrayez tout le zip avant d'installer." }
+        if (-not (Test-Path -LiteralPath (Join-Path $src $x))) { throw (Get-Text 'Ins.013' $x) }
     }
 
     # 1. Copie des fichiers (Data\ existant conservé)
     $dest = [IO.Path]::GetFullPath($Destination).TrimEnd('\')
     if ((Resolve-Path -LiteralPath $src).Path.TrimEnd('\') -ne $dest) {
-        Write-Host "  Copie vers $dest…"
+        Write-Host (Get-Text 'Ins.014' $dest)
         New-Item -ItemType Directory -Path $dest -Force | Out-Null
         foreach ($d in $dirs) {
             $t = Join-Path $dest $d
@@ -47,7 +49,7 @@ try {
             Copy-Item -LiteralPath (Join-Path $src $d) -Destination $t -Recurse -Force
         }
         foreach ($f in $files) { $p = Join-Path $src $f; if (Test-Path -LiteralPath $p) { Copy-Item -LiteralPath $p -Destination $dest -Force } }
-    } else { Write-Host '  Déjà dans le dossier d''installation : mise à jour des raccourcis seulement.' }
+    } else { Write-Host (Get-Text 'Ins.015') }
 
     # 2. Retire la marque « téléchargé depuis Internet » des fichiers installés (évite les avertissements Windows)
     Get-ChildItem -LiteralPath $dest -Recurse -File | Unblock-File -ErrorAction SilentlyContinue
@@ -65,10 +67,10 @@ try {
         $s.WorkingDirectory = $dest
         $s.IconLocation = "$dest\app.ico,0"
         $s.WindowStyle = 7   # minimisé : pas de flash de console
-        $s.Description = 'PC Toolkit — maintenance et diagnostic'
+        $s.Description = (Get-Text 'Ins.017')
         $s.Save()
         Move-Item -LiteralPath $tmp -Destination $lnk -Force
-        Write-Host "  Raccourci créé : $lnk"
+        Write-Host (Get-Text 'Ins.018' $lnk)
     }
 
     # 4. Entrée « Applications installées » (utilisateur courant uniquement)
@@ -85,19 +87,19 @@ try {
         foreach ($n in $values.Keys) { Set-ItemProperty -Path $key -Name $n -Value $values[$n] }
         foreach ($n in 'NoModify', 'NoRepair') { New-ItemProperty -Path $key -Name $n -Value 1 -PropertyType DWord -Force | Out-Null }
         New-ItemProperty -Path $key -Name EstimatedSize -Value $sizeKb -PropertyType DWord -Force | Out-Null
-        Write-Host '  Ajouté à Paramètres > Applications installées (désinstallation possible depuis Windows).'
+        Write-Host (Get-Text 'Ins.025')
     }
 
     Write-Host ''
-    Write-Host '  Installation terminée.' -ForegroundColor Green
-    Write-Host '  Lancez PC Toolkit avec le raccourci du Bureau ou du menu Démarrer.'
+    Write-Host (Get-Text 'Ins.026') -ForegroundColor Green
+    Write-Host (Get-Text 'Ins.027')
     if (-not $Quiet) {
-        $r = Read-Host '  Lancer PC Toolkit maintenant ? (O/N)'
+        $r = Read-Host (Get-Text 'Ins.028')
         if ($r -match '^[oOyY]') { Start-Process powershell.exe -ArgumentList '-ExecutionPolicy', 'Bypass', '-NoProfile', '-WindowStyle', 'Hidden', '-File', "`"$dest\PCToolkit.ps1`"" }
     }
 } catch {
     Write-Host ''
-    Write-Host "  Échec de l'installation : $($_.Exception.Message)" -ForegroundColor Red
-    if (-not $Quiet) { Read-Host '  Appuyez sur Entrée pour fermer' | Out-Null }
+    Write-Host (Get-Text 'Ins.031' $($_.Exception.Message)) -ForegroundColor Red
+    if (-not $Quiet) { Read-Host (Get-Text 'Ins.032') | Out-Null }
     exit 1
 }

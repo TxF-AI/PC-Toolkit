@@ -109,7 +109,7 @@ function Invoke-NetworkDiagnostic {
         if ($cfg) {
             Add-DiagItem $s (Get-Text 'Net.011') (($cfg.IPv4Address.IPAddress) -join ', ')
             $v6 = @($cfg.IPv6Address.IPAddress | Where-Object { $_ -notmatch '^fe80' })
-            Add-DiagItem $s (Get-Text 'Net.012') $(if ($v6.Count) { 'Oui' } else { 'Non' }) 'Info'
+            Add-DiagItem $s (Get-Text 'Net.012') $(if ($v6.Count) { Get-Text 'Core.Yes' } else { Get-Text 'Core.No' }) 'Info'
         }
     }
 

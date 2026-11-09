@@ -15,13 +15,13 @@ $script:HighPerfGuid = '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'
 
 # Services secondaires arrêtés par le Mode Performance (aucun n'est nécessaire à un jeu ou à une session MAO)
 $script:GameModeServiceList = @(
-    @{ Name = 'Spooler';        Why = (Get-Text 'Prf.002') }
-    @{ Name = 'SysMain';        Why = (Get-Text 'Prf.004') }
-    @{ Name = 'wuauserv';       Why = (Get-Text 'Prf.006') }
-    @{ Name = 'DiagTrack';      Why = (Get-Text 'Prf.008') }
-    @{ Name = 'MapsBroker';     Why = (Get-Text 'Prf.010') }
-    @{ Name = 'Fax';            Why = (Get-Text 'Prf.011') }
-    @{ Name = 'RemoteRegistry'; Why = (Get-Text 'Prf.013') }
+    @{ Name = 'Spooler';        Why = 'Prf.002' }
+    @{ Name = 'SysMain';        Why = 'Prf.004' }
+    @{ Name = 'wuauserv';       Why = 'Prf.006' }
+    @{ Name = 'DiagTrack';      Why = 'Prf.008' }
+    @{ Name = 'MapsBroker';     Why = 'Prf.010' }
+    @{ Name = 'Fax';            Why = 'Prf.011' }
+    @{ Name = 'RemoteRegistry'; Why = 'Prf.013' }
 )
 
 #region Démarrage ---------------------------------------------------------------------------
@@ -155,10 +155,10 @@ $script:StartupProtectPattern = '(?i)nvidia|nvcpl|nvbackend|nvtray|geforce|nvdis
 
 # CIBLES : applications de confort qui n'ont pas besoin de démarrer avec Windows (elles s'ouvrent à la demande).
 $script:StartupTargetRules = @(
-    @{ Category = (Get-Text 'Prf.047');          Label = (Get-Text 'Prf.048'); Pattern = '(?i)googleupdate|google ?updater|adobe.*(update|arm\b|aam)|adobegc|armsvc|jusched|sunjavaupdate|java update|microsoftedgeautolaunch|edgeupdate|microsoft edge update|update ?sched|update ?check|updater' }
-    @{ Category = (Get-Text 'Prf.050');           Label = (Get-Text 'Prf.051');          Pattern = '(?i)telemetry|customer ?experience|\bceip\b' }
-    @{ Category = (Get-Text 'Prf.053'); Label = (Get-Text 'Prf.054');        Pattern = '(?i)spotify|discord|\bsteam(\.exe|webhelper|\b)|skype|\bteams\b|msteams|cyberlink|powerdvd|youcam|epic ?games|rockstar|riotclient|riot client|curseforge|\bmedal\b|roblox|utweb|btweb|utorrent|bittorrent|slack|zoom|wondershare' }
-    @{ Category = (Get-Text 'Prf.056'); Label = (Get-Text 'Prf.057'); Pattern = '(?i)onedrive|dropbox|creative ?cloud|ccxprocess' }
+    @{ Category = 'Prf.047';          Label = 'Prf.048'; Pattern = '(?i)googleupdate|google ?updater|adobe.*(update|arm\b|aam)|adobegc|armsvc|jusched|sunjavaupdate|java update|microsoftedgeautolaunch|edgeupdate|microsoft edge update|update ?sched|update ?check|updater' }
+    @{ Category = 'Prf.050';           Label = 'Prf.051';          Pattern = '(?i)telemetry|customer ?experience|\bceip\b' }
+    @{ Category = 'Prf.053'; Label = 'Prf.054';        Pattern = '(?i)spotify|discord|\bsteam(\.exe|webhelper|\b)|skype|\bteams\b|msteams|cyberlink|powerdvd|youcam|epic ?games|rockstar|riotclient|riot client|curseforge|\bmedal\b|roblox|utweb|btweb|utorrent|bittorrent|slack|zoom|wondershare' }
+    @{ Category = 'Prf.056'; Label = 'Prf.057'; Pattern = '(?i)onedrive|dropbox|creative ?cloud|ccxprocess' }
 )
 
 function Get-StartupBackupPath { Join-Path (Join-Path (Get-AppPath Root) 'Data') 'StartupBackup.json' }
@@ -175,7 +175,7 @@ function Get-StartupRule {
     param([Parameter(Mandatory)]$Entry)
     if (Test-StartupProtected $Entry) { return $null }
     $txt = "{0} {1} {2}" -f $Entry.Name, $Entry.Path, $Entry.Command
-    foreach ($r in $script:StartupTargetRules) { if ($txt -match $r.Pattern) { return [pscustomobject]@{ Category = $r.Category; Label = $r.Label } } }
+    foreach ($r in $script:StartupTargetRules) { if ($txt -match $r.Pattern) { return [pscustomobject]@{ Category = (Get-Text $r.Category); Label = (Get-Text $r.Label) } } }
     $null
 }
 
@@ -307,7 +307,7 @@ function Get-GameModeStatus {
     $active = $schemes | Where-Object Active | Select-Object -First 1
     $svcs = foreach ($d in $script:GameModeServiceList) {
         $s = $null; try { $s = Get-Service -Name $d.Name -ErrorAction Stop } catch { }
-        [pscustomobject]@{ Name = $d.Name; Why = $d.Why; Exists = [bool]$s; Running = [bool]($s -and $s.Status -eq 'Running'); Status = $(if ($s) { [string]$s.Status } else { 'Absent' }) }
+        [pscustomobject]@{ Name = $d.Name; Why = (Get-Text $d.Why); Exists = [bool]$s; Running = [bool]($s -and $s.Status -eq 'Running'); Status = $(if ($s) { [string]$s.Status } else { 'Absent' }) }
     }
     $state = Read-GameModeState -Path $StatePath
     [pscustomobject]@{

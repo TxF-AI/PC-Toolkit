@@ -89,7 +89,7 @@ function Invoke-WindowsDiagnostic {
         $up = (Get-Date) - $os.LastBootUpTime
         Add-DiagItem $s (Get-Text 'Win.023') ((Get-Text 'Win.024') -f $os.LastBootUpTime, (Format-Span $up)) $(if ($up.TotalDays -gt 7) { 'Warn' } else { 'OK' }) $(if ($up.TotalDays -gt 7) { (Get-Text 'Win.025') } else { '' })
         $pend = Test-PendingReboot
-        Add-DiagItem $s (Get-Text 'Win.026') $(if ($pend) { 'Oui' } else { 'Non' }) $(if ($pend) { 'Warn' } else { 'OK' })
+        Add-DiagItem $s (Get-Text 'Win.026') $(if ($pend) { Get-Text 'Core.Yes' } else { Get-Text 'Core.No' }) $(if ($pend) { 'Warn' } else { 'OK' })
         $hf = Get-HotFix -ErrorAction SilentlyContinue | Where-Object InstalledOn | Sort-Object InstalledOn -Descending | Select-Object -First 1
         if ($hf) {
             $age = ((Get-Date) - $hf.InstalledOn).TotalDays

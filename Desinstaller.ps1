@@ -17,28 +17,30 @@ param(
     [switch]$Quiet
 )
 $ErrorActionPreference = 'Stop'
+# Langue (FR / EN) : repli sur la clé si le module est absent
+try { Import-Module (Join-Path $PSScriptRoot 'Modules\I18n.psm1') -Force -DisableNameChecking } catch { function Get-Text { param([string]$Key) $Key } }
 $regKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\PCToolkit'
 
 try {
     $dir = [IO.Path]::GetFullPath($InstallDir).TrimEnd('\')
     Write-Host ''
-    Write-Host '  ' -NoNewline; Write-Host "$([char]0x26A1) PC//TOOLKIT" -ForegroundColor Red -NoNewline; Write-Host ' — désinstallation'
+    Write-Host '  ' -NoNewline; Write-Host "$([char]0x26A1) PC//TOOLKIT" -ForegroundColor Red -NoNewline; Write-Host (Get-Text 'Uni.004')
     Write-Host ''
 
     # Garde-fou : on ne supprime qu'un dossier qui est bien une installation de PC Toolkit
     if (-not (Test-Path -LiteralPath (Join-Path $dir 'PCToolkit.ps1')) -or -not (Test-Path -LiteralPath (Join-Path $dir 'Modules\Core.psm1'))) {
-        throw "« $dir » n'est pas un dossier PC Toolkit : rien n'a été supprimé."
+        throw (Get-Text 'Uni.005' $dir)
     }
     $forbidden = @($env:SystemDrive + '\', $env:USERPROFILE, $env:LOCALAPPDATA, $env:APPDATA, $env:windir, [Environment]::GetFolderPath('Desktop')) | ForEach-Object { $_.TrimEnd('\') }
-    if ($forbidden -contains $dir) { throw "Dossier protégé ($dir) : rien n'a été supprimé." }
+    if ($forbidden -contains $dir) { throw (Get-Text 'Uni.007' $dir) }
 
     $hasData = Test-Path -LiteralPath (Join-Path $dir 'Data')
     if (-not $Quiet) {
-        Write-Host "  Dossier : $dir"
-        $r = Read-Host '  Désinstaller PC Toolkit ? (O/N)'
-        if ($r -notmatch '^[oOyY]') { Write-Host '  Annulé : rien n''a été modifié.'; exit 0 }
+        Write-Host (Get-Text 'Uni.009' $dir)
+        $r = Read-Host (Get-Text 'Uni.010')
+        if ($r -notmatch '^[oOyY]') { Write-Host (Get-Text 'Uni.011'); exit 0 }
         if ($hasData -and -not $KeepData) {
-            $k = Read-Host '  Conserver l''historique des analyses (dossier Data) ? (O/N)'
+            $k = Read-Host (Get-Text 'Uni.012')
             $KeepData = $k -match '^[oOyY]'
         }
     }
@@ -54,7 +56,7 @@ try {
             $lnkArgs = try { $ns.ParseName($lnk.Name).GetLink.Arguments } catch { '' }
             if ($lnkArgs -like "*`"$target`"*") {
                 Remove-Item -LiteralPath $lnk.FullName -Force
-                Write-Host "  Raccourci retiré : $($lnk.FullName)"
+                Write-Host (Get-Text 'Uni.013' $($lnk.FullName))
             }
         }
     }
@@ -62,7 +64,7 @@ try {
     # 2. Entrée « Applications installées » (seulement si elle désigne ce dossier)
     if (Test-Path $regKey) {
         $loc = (Get-ItemProperty $regKey -ErrorAction SilentlyContinue).InstallLocation
-        if ($loc -and $loc.TrimEnd('\') -eq $dir) { Remove-Item $regKey -Recurse -Force; Write-Host '  Entrée « Applications installées » retirée.' }
+        if ($loc -and $loc.TrimEnd('\') -eq $dir) { Remove-Item $regKey -Recurse -Force; Write-Host (Get-Text 'Uni.014') }
     }
 
     # 3. Fichiers (le script lui-même est déjà en mémoire : il peut être supprimé)
@@ -74,12 +76,12 @@ try {
     if (-not $KeepData -or -not $hasData) { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue }
 
     Write-Host ''
-    Write-Host '  PC Toolkit est désinstallé.' -ForegroundColor Green
-    if ($KeepData -and $hasData) { Write-Host "  Historique conservé dans : $dir\Data" }
-    if (-not $Quiet) { Read-Host '  Appuyez sur Entrée pour fermer' | Out-Null }
+    Write-Host (Get-Text 'Uni.016') -ForegroundColor Green
+    if ($KeepData -and $hasData) { Write-Host (Get-Text 'Uni.017' $dir) }
+    if (-not $Quiet) { Read-Host (Get-Text 'Uni.018') | Out-Null }
 } catch {
     Write-Host ''
-    Write-Host "  Échec de la désinstallation : $($_.Exception.Message)" -ForegroundColor Red
-    if (-not $Quiet) { Read-Host '  Appuyez sur Entrée pour fermer' | Out-Null }
+    Write-Host (Get-Text 'Uni.019' $($_.Exception.Message)) -ForegroundColor Red
+    if (-not $Quiet) { Read-Host (Get-Text 'Uni.020') | Out-Null }
     exit 1
 }

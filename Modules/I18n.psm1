@@ -58,6 +58,8 @@ function Get-AppLanguage {
     <# Langue courante : celle de Data\language.json, sinon celle de Windows. #>
     if ($script:Current) { return $script:Current }
     $code = $null
+    # Variable d'environnement PCTOOLKIT_LANG (tests, développement) : prioritaire, jamais écrite sur disque
+    if ($env:PCTOOLKIT_LANG -in $script:Supported) { $script:Current = $env:PCTOOLKIT_LANG; return $script:Current }
     try {
         if (Test-Path -LiteralPath $script:LangFile) {
             $code = (Get-Content -LiteralPath $script:LangFile -Raw -Encoding UTF8 | ConvertFrom-Json).Language
