@@ -62,7 +62,7 @@ $Projects = [ordered]@{
         Name = 'PortDoctor (v0.1.0)'; Dir = (Join-Path $Parent 'port-doctor'); Kit = 'LAUNCH_KIT.md'
         Repo = 'https://github.com/TxF-AI/port-doctor'; Release = 'https://github.com/TxF-AI/port-doctor/releases/tag/v0.1.0'
         Media = @('assets\demo.gif', 'assets\ui-preview.png', 'assets\ui-smartkill.png')
-        Subs = @('rust', 'windows', 'programming', 'CoolGithubProjects')
+        Subs = @('node', 'webdev', 'rust', 'windows', 'programming', 'CoolGithubProjects')
         Discord = @('Discord officiel Tauri (#showcase) : https://discord.gg/tauri', 'DevFR (salon projets)', 'Serveurs Rust FR/EN')
     }
     '3' = @{
