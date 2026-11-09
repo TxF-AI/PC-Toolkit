@@ -15,13 +15,13 @@ $script:HighPerfGuid = '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c'
 
 # Services secondaires arrêtés par le Mode Performance (aucun n'est nécessaire à un jeu ou à une session MAO)
 $script:GameModeServiceList = @(
-    @{ Name = 'Spooler';        Why = 'Impression (plus d''impression tant que le mode est actif)' }
-    @{ Name = 'SysMain';        Why = 'Préchargement Superfetch (activité disque en arrière-plan)' }
-    @{ Name = 'wuauserv';       Why = 'Windows Update (pas de téléchargement pendant la session)' }
-    @{ Name = 'DiagTrack';      Why = 'Télémétrie (expériences des utilisateurs connectés)' }
-    @{ Name = 'MapsBroker';     Why = 'Cartes téléchargées' }
-    @{ Name = 'Fax';            Why = 'Télécopie' }
-    @{ Name = 'RemoteRegistry'; Why = 'Accès distant au registre' }
+    @{ Name = 'Spooler';        Why = (Get-Text 'Prf.002') }
+    @{ Name = 'SysMain';        Why = (Get-Text 'Prf.004') }
+    @{ Name = 'wuauserv';       Why = (Get-Text 'Prf.006') }
+    @{ Name = 'DiagTrack';      Why = (Get-Text 'Prf.008') }
+    @{ Name = 'MapsBroker';     Why = (Get-Text 'Prf.010') }
+    @{ Name = 'Fax';            Why = (Get-Text 'Prf.011') }
+    @{ Name = 'RemoteRegistry'; Why = (Get-Text 'Prf.013') }
 )
 
 #region Démarrage ---------------------------------------------------------------------------
@@ -65,9 +65,9 @@ function Get-StartupItems {
     $approvedRoot = 'Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved'
 
     $regSources = @(
-        @{ Hive = 'HKCU'; Key = 'Software\Microsoft\Windows\CurrentVersion\Run';             Approved = 'Run';   Scope = 'User';    Source = 'Registre (utilisateur)' }
-        @{ Hive = 'HKLM'; Key = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Run';             Approved = 'Run';   Scope = 'Machine'; Source = 'Registre (système)' }
-        @{ Hive = 'HKLM'; Key = 'SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run'; Approved = 'Run32'; Scope = 'Machine'; Source = 'Registre (système, 32 bits)' }
+        @{ Hive = 'HKCU'; Key = 'Software\Microsoft\Windows\CurrentVersion\Run';             Approved = 'Run';   Scope = 'User';    Source = (Get-Text 'Prf.016') }
+        @{ Hive = 'HKLM'; Key = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Run';             Approved = 'Run';   Scope = 'Machine'; Source = (Get-Text 'Prf.019') }
+        @{ Hive = 'HKLM'; Key = 'SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Run'; Approved = 'Run32'; Scope = 'Machine'; Source = (Get-Text 'Prf.022') }
     )
     foreach ($s in $regSources) {
         try {
@@ -88,12 +88,12 @@ function Get-StartupItems {
                     KeyPath = $path; ValueName = $n; ApprovedKey = $approvedKey
                 })
             }
-        } catch { Write-AppLog "Démarrage (registre $($s.Hive)) : $($_.Exception.Message)" 'WARN' }
+        } catch { Write-AppLog (Get-Text 'Prf.024' $($s.Hive) $($_.Exception.Message)) 'WARN' }
     }
 
     $folders = @(
-        @{ Dir = (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup'); Scope = 'User';    Source = 'Dossier Démarrage (utilisateur)'; Hive = 'HKCU' }
-        @{ Dir = (Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\StartUp'); Scope = 'Machine'; Source = 'Dossier Démarrage (système)'; Hive = 'HKLM' }
+        @{ Dir = (Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup'); Scope = 'User';    Source = (Get-Text 'Prf.027'); Hive = 'HKCU' }
+        @{ Dir = (Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\StartUp'); Scope = 'Machine'; Source = (Get-Text 'Prf.031'); Hive = 'HKLM' }
     )
     $shell = $null
     foreach ($f in $folders) {
@@ -118,7 +118,7 @@ function Get-StartupItems {
                     KeyPath = $f.Dir; ValueName = $file.Name; ApprovedKey = $approvedKey
                 })
             }
-        } catch { Write-AppLog "Démarrage (dossier $($f.Dir)) : $($_.Exception.Message)" 'WARN' }
+        } catch { Write-AppLog (Get-Text 'Prf.034' $($f.Dir) $($_.Exception.Message)) 'WARN' }
     }
     if ($shell) { try { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($shell) } catch { } }
     @($out | Sort-Object @{ Expression = { -not $_.Enabled } }, Name)   # actifs d'abord
@@ -131,17 +131,17 @@ function Set-StartupEntryState {
         [Parameter(Mandatory)][bool]$Enabled,
         [switch]$Confirmed
     )
-    if (-not $Confirmed) { throw 'Confirmation explicite requise (-Confirmed).' }
-    if ($Entry.Scope -eq 'Machine' -and -not (Test-IsAdmin)) { throw 'Ce programme est défini pour tous les utilisateurs : il faut relancer PC Toolkit en administrateur.' }
-    if (-not $Entry.ApprovedKey -or -not $Entry.ValueName) { throw 'Entrée de démarrage invalide.' }
+    if (-not $Confirmed) { throw (Get-Text 'Prf.035') }
+    if ($Entry.Scope -eq 'Machine' -and -not (Test-IsAdmin)) { throw (Get-Text 'Prf.037') }
+    if (-not $Entry.ApprovedKey -or -not $Entry.ValueName) { throw (Get-Text 'Prf.038') }
     try {
         if (-not (Test-Path -LiteralPath $Entry.ApprovedKey)) { [void](New-Item -Path $Entry.ApprovedKey -Force -ErrorAction Stop) }
         Set-ItemProperty -LiteralPath $Entry.ApprovedKey -Name $Entry.ValueName -Value (Get-StartupApprovedBytes -Enabled $Enabled) -Type Binary -ErrorAction Stop
     } catch {
-        Write-AppLog "Démarrage [$($Entry.Name)] : $($_.Exception.Message)" 'ERROR'
-        throw "Impossible de modifier « $($Entry.Name) » : $($_.Exception.Message)"
+        Write-AppLog (Get-Text 'Prf.039' $($Entry.Name) $($_.Exception.Message)) 'ERROR'
+        throw (Get-Text 'Prf.041' $($Entry.Name) $($_.Exception.Message))
     }
-    Write-AppLog ("Démarrage : « {0} » {1} ({2})" -f $Entry.Name, $(if ($Enabled) { 'réactivé' } else { 'désactivé' }), $Entry.Source) 'ACTION'
+    Write-AppLog ((Get-Text 'Prf.042') -f $Entry.Name, $(if ($Enabled) { (Get-Text 'Prf.043') } else { (Get-Text 'Prf.044') }), $Entry.Source) 'ACTION'
     $true
 }
 
@@ -155,10 +155,10 @@ $script:StartupProtectPattern = '(?i)nvidia|nvcpl|nvbackend|nvtray|geforce|nvdis
 
 # CIBLES : applications de confort qui n'ont pas besoin de démarrer avec Windows (elles s'ouvrent à la demande).
 $script:StartupTargetRules = @(
-    @{ Category = 'Mise à jour';          Label = 'Planificateur de mise à jour'; Pattern = '(?i)googleupdate|google ?updater|adobe.*(update|arm\b|aam)|adobegc|armsvc|jusched|sunjavaupdate|java update|microsoftedgeautolaunch|edgeupdate|microsoft edge update|update ?sched|update ?check|updater' }
-    @{ Category = 'Télémétrie';           Label = 'Agent de télémétrie';          Pattern = '(?i)telemetry|customer ?experience|\bceip\b' }
-    @{ Category = 'Lanceur / messagerie'; Label = 'Lanceur ou messagerie';        Pattern = '(?i)spotify|discord|\bsteam(\.exe|webhelper|\b)|skype|\bteams\b|msteams|cyberlink|powerdvd|youcam|epic ?games|rockstar|riotclient|riot client|curseforge|\bmedal\b|roblox|utweb|btweb|utorrent|bittorrent|slack|zoom|wondershare' }
-    @{ Category = 'Cloud / synchronisation'; Label = 'Synchronisation en arrière-plan'; Pattern = '(?i)onedrive|dropbox|creative ?cloud|ccxprocess' }
+    @{ Category = (Get-Text 'Prf.047');          Label = (Get-Text 'Prf.048'); Pattern = '(?i)googleupdate|google ?updater|adobe.*(update|arm\b|aam)|adobegc|armsvc|jusched|sunjavaupdate|java update|microsoftedgeautolaunch|edgeupdate|microsoft edge update|update ?sched|update ?check|updater' }
+    @{ Category = (Get-Text 'Prf.050');           Label = (Get-Text 'Prf.051');          Pattern = '(?i)telemetry|customer ?experience|\bceip\b' }
+    @{ Category = (Get-Text 'Prf.053'); Label = (Get-Text 'Prf.054');        Pattern = '(?i)spotify|discord|\bsteam(\.exe|webhelper|\b)|skype|\bteams\b|msteams|cyberlink|powerdvd|youcam|epic ?games|rockstar|riotclient|riot client|curseforge|\bmedal\b|roblox|utweb|btweb|utorrent|bittorrent|slack|zoom|wondershare' }
+    @{ Category = (Get-Text 'Prf.056'); Label = (Get-Text 'Prf.057'); Pattern = '(?i)onedrive|dropbox|creative ?cloud|ccxprocess' }
 )
 
 function Get-StartupBackupPath { Join-Path (Join-Path (Get-AppPath Root) 'Data') 'StartupBackup.json' }
@@ -199,7 +199,7 @@ function Get-StartupCleanupPlan {
 function Read-StartupBackup {
     param([string]$Path)
     if (-not $Path) { $Path = Get-StartupBackupPath }
-    try { if (Test-Path -LiteralPath $Path) { return (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json) } } catch { Write-AppLog "Sauvegarde démarrage illisible : $($_.Exception.Message)" 'WARN' }
+    try { if (Test-Path -LiteralPath $Path) { return (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json) } } catch { Write-AppLog (Get-Text 'Prf.061' $($_.Exception.Message)) 'WARN' }
     $null
 }
 
@@ -219,10 +219,10 @@ function Invoke-StartupAutoClean {
         La liste blanche est revérifiée ici, quelle que soit la liste reçue.
     #>
     param([switch]$Confirmed, $Entries, [string]$BackupPath)
-    if (-not $Confirmed) { throw 'Confirmation explicite requise (-Confirmed).' }
+    if (-not $Confirmed) { throw (Get-Text 'Prf.063') }
     if (-not $BackupPath) { $BackupPath = Get-StartupBackupPath }
     $plan = Get-StartupCleanupPlan -Entries $Entries
-    $skipped = @($plan.NeedAdmin | ForEach-Object { [pscustomobject]@{ Name = $_.Name; Reason = 'administrateur requis' } })
+    $skipped = @($plan.NeedAdmin | ForEach-Object { [pscustomobject]@{ Name = $_.Name; Reason = (Get-Text 'Prf.064') } })
     $backup = Read-StartupBackup -Path $BackupPath
     $items = New-Object System.Collections.ArrayList
     if ($backup) { foreach ($i in @($backup.Items)) { [void]$items.Add($i) } }
@@ -252,17 +252,17 @@ function Invoke-StartupAutoClean {
         } catch { $failed += [pscustomobject]@{ Name = $e.Name; Reason = $_.Exception.Message } }
         Write-StartupBackup -Path $BackupPath -Items @($items | Where-Object Applied)
     }
-    Write-AppLog ("Démarrage : nettoyage automatique ({0} désactivé(s), {1} ignoré(s), {2} échec(s))" -f $disabled.Count, $skipped.Count, $failed.Count) 'ACTION'
+    Write-AppLog ((Get-Text 'Prf.065') -f $disabled.Count, $skipped.Count, $failed.Count) 'ACTION'
     [pscustomobject]@{ Disabled = @($disabled); Skipped = @($skipped); Failed = @($failed); Protected = $plan.Protected.Count }
 }
 
 function Restore-StartupBackup {
     <# Remet chaque élément dans son état initial exact (valeur StartupApproved d'origine, ou absente). #>
     param([switch]$Confirmed, [string]$BackupPath)
-    if (-not $Confirmed) { throw 'Confirmation explicite requise (-Confirmed).' }
+    if (-not $Confirmed) { throw (Get-Text 'Prf.067') }
     if (-not $BackupPath) { $BackupPath = Get-StartupBackupPath }
     $backup = Read-StartupBackup -Path $BackupPath
-    if (-not $backup -or @($backup.Items).Count -eq 0) { throw 'Aucune sauvegarde de démarrage à restaurer.' }
+    if (-not $backup -or @($backup.Items).Count -eq 0) { throw (Get-Text 'Prf.068') }
     $isAdmin = Test-IsAdmin
     $restored = @(); $remaining = @(); $failed = @()
     foreach ($i in @($backup.Items)) {
@@ -274,7 +274,7 @@ function Restore-StartupBackup {
         } catch { $failed += $i.Name; $remaining += $i }
     }
     Write-StartupBackup -Path $BackupPath -Items $remaining
-    Write-AppLog ("Démarrage : restauration ({0} rétabli(s), {1} en attente)" -f $restored.Count, $remaining.Count) 'ACTION'
+    Write-AppLog ((Get-Text 'Prf.070') -f $restored.Count, $remaining.Count) 'ACTION'
     [pscustomobject]@{ Restored = @($restored); Remaining = @($remaining | ForEach-Object Name); Failed = @($failed) }
 }
 
@@ -322,7 +322,7 @@ function Get-GameModeStatus {
 
 function Read-GameModeState {
     param([Parameter(Mandatory)][string]$Path)
-    try { if (Test-Path -LiteralPath $Path) { return (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json) } } catch { Write-AppLog "Mode Performance (état illisible) : $($_.Exception.Message)" 'WARN' }
+    try { if (Test-Path -LiteralPath $Path) { return (Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json) } } catch { Write-AppLog (Get-Text 'Prf.075' $($_.Exception.Message)) 'WARN' }
     $null
 }
 
@@ -339,7 +339,7 @@ function Invoke-RamTrim {
         de Windows et la RAM « disponible » augmente. Effet temporaire (les pages reviennent à l'usage). Aucun processus n'est arrêté.
     #>
     param([switch]$Confirmed)
-    if (-not $Confirmed) { throw 'Confirmation explicite requise (-Confirmed).' }
+    if (-not $Confirmed) { throw (Get-Text 'Prf.076') }
     if (-not ('PcToolkitMem' -as [type])) {
         Add-Type -Namespace '' -Name PcToolkitMem -MemberDefinition '[System.Runtime.InteropServices.DllImport("psapi.dll")] public static extern bool EmptyWorkingSet(System.IntPtr h);' -ErrorAction Stop
     }
@@ -352,7 +352,7 @@ function Invoke-RamTrim {
     $freeAfter = (Get-SafeCim Win32_OperatingSystem).FreePhysicalMemory
     $freedMB = $null
     if ($freeBefore -and $freeAfter) { $freedMB = [math]::Round(($freeAfter - $freeBefore) / 1KB, 0) }
-    Write-AppLog ("Mode Performance : vidage RAM sur {0} processus ({1} Mo gagnés)" -f $n, $freedMB) 'ACTION'
+    Write-AppLog ((Get-Text 'Prf.079') -f $n, $freedMB) 'ACTION'
     [pscustomobject]@{ Processes = $n; FreedMB = $freedMB }
 }
 
@@ -361,10 +361,10 @@ function Enable-GameMode {
     # Presets : -OnlyServices limite la liste (sous-ensemble de la liste officielle), -SkipPowerPlan laisse le plan d'alimentation,
     # -ProfileName est mémorisé dans l'état (affiché par le bilan et la page).
     param([switch]$Confirmed, [switch]$FlushRam, [string]$StatePath, [string[]]$OnlyServices, [switch]$SkipPowerPlan, [string]$ProfileName)
-    if (-not $Confirmed) { throw 'Confirmation explicite requise (-Confirmed).' }
+    if (-not $Confirmed) { throw (Get-Text 'Prf.081') }
     if (-not $StatePath) { $StatePath = Get-GameModeStatePath }
-    if (-not (Test-IsAdmin)) { throw 'Le Mode Performance arrête des services : relancez PC Toolkit en administrateur.' }
-    if (Read-GameModeState -Path $StatePath) { throw 'Le Mode Performance est déjà actif : restaurez d''abord l''état initial.' }
+    if (-not (Test-IsAdmin)) { throw (Get-Text 'Prf.082') }
+    if (Read-GameModeState -Path $StatePath) { throw (Get-Text 'Prf.083') }
 
     $schemes = Get-PowerSchemes
     $before = $schemes | Where-Object Active | Select-Object -First 1
@@ -376,7 +376,7 @@ function Enable-GameMode {
     # Sauvegarde AVANT toute modification
     $state = [ordered]@{
         Date = (Get-Date).ToString('yyyy-MM-dd HH:mm:ss')
-        Profile = $(if ($ProfileName) { $ProfileName } else { 'Mode Performance' })
+        Profile = $(if ($ProfileName) { $ProfileName } else { (Get-Text 'Prf.086') })
         PreviousPlanGuid = $(if ($before -and -not $SkipPowerPlan) { $before.Guid } else { $null })
         PreviousPlanName = $(if ($before) { $before.Name } else { $null })
         CreatedPlanGuid = $null
@@ -384,13 +384,13 @@ function Enable-GameMode {
         ServicesStopped = @()
     }
     Write-GameModeState -Path $StatePath -State $state
-    Write-AppLog ("Mode Performance : sauvegarde de l'état ({0} service(s) actif(s), plan « {1} »)" -f $running.Count, $state.PreviousPlanName) 'ACTION'
+    Write-AppLog ((Get-Text 'Prf.087') -f $running.Count, $state.PreviousPlanName) 'ACTION'
 
     # Plan d'alimentation : Ultimate existant > Haute performance existant > création d'une copie d'Ultimate
     $planNote = ''; $target = $null
     $ult = $schemes | Where-Object { $_.Guid -eq $script:UltimateGuid } | Select-Object -First 1
     $hi = $schemes | Where-Object { $_.Guid -eq $script:HighPerfGuid } | Select-Object -First 1
-    if ($SkipPowerPlan) { $planNote = 'Plan d''alimentation conservé (non modifié par ce profil).' }
+    if ($SkipPowerPlan) { $planNote = (Get-Text 'Prf.089') }
     elseif ($ult) { $target = $ult } elseif ($hi) { $target = $hi }
     else {
         try {
@@ -398,16 +398,16 @@ function Enable-GameMode {
             if ($o -match '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})') {
                 $state.CreatedPlanGuid = $Matches[1].ToLower()
                 Write-GameModeState -Path $StatePath -State $state
-                $target = [pscustomobject]@{ Guid = $state.CreatedPlanGuid; Name = 'Performances ultimes' }
+                $target = [pscustomobject]@{ Guid = $state.CreatedPlanGuid; Name = (Get-Text 'Prf.090') }
             }
         } catch { }
     }
     $planAfter = $null
     if ($target) {
         & powercfg.exe /setactive $target.Guid 2>$null
-        if ($LASTEXITCODE -eq 0) { $planAfter = $target.Name; Write-AppLog "Mode Performance : plan « $planAfter » activé" 'ACTION' }
-        else { $planNote = 'Windows a refusé le changement de plan d''alimentation.' }
-    } elseif (-not $SkipPowerPlan) { $planNote = 'Aucun plan haute performance disponible sur ce PC (plan inchangé).' }
+        if ($LASTEXITCODE -eq 0) { $planAfter = $target.Name; Write-AppLog (Get-Text 'Prf.091' $planAfter) 'ACTION' }
+        else { $planNote = (Get-Text 'Prf.093') }
+    } elseif (-not $SkipPowerPlan) { $planNote = (Get-Text 'Prf.094') }
 
     # Services
     $stopped = New-Object System.Collections.ArrayList
@@ -418,15 +418,15 @@ function Enable-GameMode {
             [void]$stopped.Add($name)
             $state.ServicesStopped = @($stopped)
             Write-GameModeState -Path $StatePath -State $state
-            Write-AppLog "Mode Performance : service $name arrêté" 'ACTION'
+            Write-AppLog (Get-Text 'Prf.095' $name) 'ACTION'
         } catch {
             [void]$failed.Add($name)
-            Write-AppLog "Mode Performance : service $name non arrêté ($($_.Exception.Message))" 'WARN'
+            Write-AppLog (Get-Text 'Prf.097' $name $($_.Exception.Message)) 'WARN'
         }
     }
 
     $ram = $null
-    if ($FlushRam) { try { $ram = Invoke-RamTrim -Confirmed } catch { Write-AppLog "Mode Performance : vidage RAM impossible ($($_.Exception.Message))" 'WARN' } }
+    if ($FlushRam) { try { $ram = Invoke-RamTrim -Confirmed } catch { Write-AppLog (Get-Text 'Prf.098' $($_.Exception.Message)) 'WARN' } }
 
     [pscustomobject]@{
         PlanBefore = $state.PreviousPlanName; PlanAfter = $planAfter; PlanNote = $planNote
@@ -438,21 +438,21 @@ function Enable-GameMode {
 function Restore-GameMode {
     <# Remet le plan d'alimentation d'origine et relance les services arrêtés par le Mode Performance. #>
     param([switch]$Confirmed, [string]$StatePath)
-    if (-not $Confirmed) { throw 'Confirmation explicite requise (-Confirmed).' }
+    if (-not $Confirmed) { throw (Get-Text 'Prf.099') }
     if (-not $StatePath) { $StatePath = Get-GameModeStatePath }
     $state = Read-GameModeState -Path $StatePath
-    if (-not $state) { throw 'Le Mode Performance n''est pas actif : rien à restaurer.' }
+    if (-not $state) { throw (Get-Text 'Prf.100') }
     $toStart = @($state.ServicesStopped)
-    if ($toStart.Count -gt 0 -and -not (Test-IsAdmin)) { throw 'Relancer les services demande les droits administrateur : relancez PC Toolkit en administrateur.' }
+    if ($toStart.Count -gt 0 -and -not (Test-IsAdmin)) { throw (Get-Text 'Prf.101') }
 
     $planNote = ''; $planBack = $null; $planDone = $true
     if ($state.PreviousPlanGuid) {
         $exists = Get-PowerSchemes | Where-Object { $_.Guid -eq $state.PreviousPlanGuid } | Select-Object -First 1
         if ($exists) {
             & powercfg.exe /setactive $state.PreviousPlanGuid 2>$null
-            if ($LASTEXITCODE -eq 0) { $planBack = $state.PreviousPlanName; Write-AppLog "Mode Performance : plan « $planBack » restauré" 'ACTION' }
-            else { $planNote = 'Windows a refusé le retour au plan d''origine.'; $planDone = $false }
-        } else { $planNote = 'Le plan d''origine n''existe plus.' }
+            if ($LASTEXITCODE -eq 0) { $planBack = $state.PreviousPlanName; Write-AppLog (Get-Text 'Prf.102' $planBack) 'ACTION' }
+            else { $planNote = (Get-Text 'Prf.104'); $planDone = $false }
+        } else { $planNote = (Get-Text 'Prf.105') }
     }
     if ($state.CreatedPlanGuid -and $planBack) {
         & powercfg.exe /delete $state.CreatedPlanGuid 2>$null   # supprime seulement le plan créé par le Mode Performance
@@ -461,8 +461,8 @@ function Restore-GameMode {
     $started = New-Object System.Collections.ArrayList
     $failed = New-Object System.Collections.ArrayList
     foreach ($name in $toStart) {
-        try { Start-Service -Name $name -ErrorAction Stop; [void]$started.Add($name); Write-AppLog "Mode Performance : service $name relancé" 'ACTION' }
-        catch { [void]$failed.Add($name); Write-AppLog "Mode Performance : service $name non relancé ($($_.Exception.Message))" 'WARN' }
+        try { Start-Service -Name $name -ErrorAction Stop; [void]$started.Add($name); Write-AppLog (Get-Text 'Prf.106' $name) 'ACTION' }
+        catch { [void]$failed.Add($name); Write-AppLog (Get-Text 'Prf.108' $name $($_.Exception.Message)) 'WARN' }
     }
     if ($failed.Count -eq 0 -and $planDone) { Remove-Item -LiteralPath $StatePath -Force -ErrorAction SilentlyContinue }
     else {

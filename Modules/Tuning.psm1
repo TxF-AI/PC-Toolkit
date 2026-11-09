@@ -14,23 +14,23 @@ function Get-TuningProfiles {
     <# Les 3 presets. Services : sous-ensemble de la liste officielle du Mode Performance. #>
     @(
         [pscustomobject]@{
-            Id = 'Game'; Name = 'Jeu'
-            Summary = 'Performances maximales pour jouer.'
-            Details = 'Plan Performances ultimes / élevées, arrêt temporaire de 7 services secondaires, vidage du cache RAM, nettoyage des fichiers temporaires et du démarrage.'
+            Id = 'Game'; Name = (Get-Text 'Tun.NameGame')
+            Summary = (Get-Text 'Tun.002')
+            Details = (Get-Text 'Tun.003')
             Services = @('Spooler', 'SysMain', 'wuauserv', 'DiagTrack', 'MapsBroker', 'Fax', 'RemoteRegistry')
             Power = $true; FlushRam = $true; CleanTemp = $true; CleanStartup = $true
         }
         [pscustomobject]@{
-            Id = 'MAO'; Name = 'MAO'
-            Summary = 'Latence stable pour l''audio : aucune interruption en arrière-plan.'
-            Details = 'Plan haute performance, arrêt temporaire des services secondaires (dont Windows Update et SysMain, sources de pics de latence), nettoyage du démarrage. La RAM n''est PAS vidée : cela évincerait les échantillons et plugins chargés en mémoire. Les services audio ne sont jamais touchés.'
+            Id = 'MAO'; Name = (Get-Text 'Tun.NameMao')
+            Summary = (Get-Text 'Tun.010')
+            Details = (Get-Text 'Tun.011')
             Services = @('Spooler', 'SysMain', 'wuauserv', 'DiagTrack', 'MapsBroker', 'Fax', 'RemoteRegistry')
             Power = $true; FlushRam = $false; CleanTemp = $false; CleanStartup = $true
         }
         [pscustomobject]@{
-            Id = 'Office'; Name = 'Bureautique'
-            Summary = 'Allègement discret pour le travail quotidien.'
-            Details = 'Plan d''alimentation conservé, arrêt temporaire de 4 services inutiles (télémétrie, cartes, fax, registre distant), nettoyage des fichiers temporaires. Le démarrage n''est pas modifié.'
+            Id = 'Office'; Name = (Get-Text 'Tun.019')
+            Summary = (Get-Text 'Tun.020')
+            Details = (Get-Text 'Tun.021')
             Services = @('DiagTrack', 'MapsBroker', 'Fax', 'RemoteRegistry')
             Power = $false; FlushRam = $false; CleanTemp = $true; CleanStartup = $false
         }
@@ -41,7 +41,7 @@ function Get-TuningPlan {
     <# Lecture seule : ce que le preset ferait réellement maintenant (pour l'aperçu avant confirmation). #>
     param([Parameter(Mandatory)][string]$Id)
     $p = Get-TuningProfiles | Where-Object { $_.Id -eq $Id } | Select-Object -First 1
-    if (-not $p) { throw "Preset inconnu : $Id" }
+    if (-not $p) { throw (Get-Text 'Tun.025' $Id) }
     $st = Get-GameModeStatus
     $running = @($st.Services | Where-Object { $_.Running -and $p.Services -contains $_.Name })
     $tempCount = $null; $tempBytes = $null
@@ -58,51 +58,51 @@ function Get-TuningPlan {
 function Invoke-TuningProfile {
     <# Applique un preset étape par étape. Une étape qui échoue n'empêche pas les autres. Exige -Confirmed. #>
     param([Parameter(Mandatory)][string]$Id, [switch]$Confirmed, $Ctx)
-    if (-not $Confirmed) { throw 'Confirmation explicite requise (-Confirmed).' }
+    if (-not $Confirmed) { throw (Get-Text 'Tun.026') }
     $p = Get-TuningProfiles | Where-Object { $_.Id -eq $Id } | Select-Object -First 1
-    if (-not $p) { throw "Preset inconnu : $Id" }
+    if (-not $p) { throw (Get-Text 'Tun.027' $Id) }
     $steps = New-Object System.Collections.ArrayList
     $step = { param($n, $s, $d) [void]$steps.Add([pscustomobject]@{ Step = $n; Status = $s; Detail = $d }) }
-    Write-AppLog "Preset d'optimisation « $($p.Name) » : démarrage" 'ACTION'
-    Update-DiagProgress $Ctx 5 'Préparation…'
+    Write-AppLog (Get-Text 'Tun.028' $($p.Name)) 'ACTION'
+    Update-DiagProgress $Ctx 5 (Get-Text 'Tun.030')
 
-    Update-DiagProgress $Ctx 15 'Plan d''alimentation et services…'
+    Update-DiagProgress $Ctx 15 (Get-Text 'Tun.031')
     if ($p.Power -or $p.Services.Count -gt 0) {
         $st = Get-GameModeStatus
-        if (-not $st.IsAdmin) { & $step 'Plan d''alimentation et services' 'Ignoré' 'droits administrateur requis' }
-        elseif ($st.ModeActive) { & $step 'Plan d''alimentation et services' 'Ignoré' 'un profil est déjà actif : restaurez-le d''abord' }
+        if (-not $st.IsAdmin) { & $step (Get-Text 'Tun.032') 'Ignoré' (Get-Text 'Tun.034') }
+        elseif ($st.ModeActive) { & $step (Get-Text 'Tun.035') 'Ignoré' (Get-Text 'Tun.037') }
         else {
             try {
-                $r = Enable-GameMode -Confirmed -OnlyServices $p.Services -SkipPowerPlan:(-not $p.Power) -ProfileName "Preset $($p.Name)"
+                $r = Enable-GameMode -Confirmed -OnlyServices $p.Services -SkipPowerPlan:(-not $p.Power) -ProfileName (Get-Text 'Tun.038' $($p.Name))
                 $d = @()
-                if ($p.Power) { $d += $(if ($r.PlanAfter) { "plan « $($r.PlanAfter) »" } else { 'plan inchangé' }) }
-                $d += "$($r.Stopped.Count) service(s) arrêté(s)" + $(if ($r.Stopped.Count) { ' (' + ($r.Stopped -join ', ') + ')' } else { '' })
-                if ($r.Failed.Count) { $d += 'non arrêtés : ' + ($r.Failed -join ', ') }
-                & $step 'Plan d''alimentation et services' 'OK' ($d -join ' ; ')
-            } catch { & $step 'Plan d''alimentation et services' 'Échec' $_.Exception.Message }
+                if ($p.Power) { $d += $(if ($r.PlanAfter) { (Get-Text 'Tun.039' $($r.PlanAfter)) } else { (Get-Text 'Tun.040') }) }
+                $d += (Get-Text 'Tun.041' $($r.Stopped.Count)) + $(if ($r.Stopped.Count) { ' (' + ($r.Stopped -join ', ') + ')' } else { '' })
+                if ($r.Failed.Count) { $d += (Get-Text 'Tun.042') + ($r.Failed -join ', ') }
+                & $step (Get-Text 'Tun.043') 'OK' ($d -join ' ; ')
+            } catch { & $step (Get-Text 'Tun.044') 'Échec' $_.Exception.Message }
         }
     }
-    Update-DiagProgress $Ctx 45 'Cache RAM…'
+    Update-DiagProgress $Ctx 45 (Get-Text 'Tun.046')
     if ($p.FlushRam) {
-        try { $r = Invoke-RamTrim -Confirmed; & $step 'Cache RAM' 'OK' ("{0} processus allégés ({1})" -f $r.Processes, $(if ($null -ne $r.FreedMB) { "$($r.FreedMB) Mo gagnés" } else { 'gain non mesurable' })) }
-        catch { & $step 'Cache RAM' 'Échec' $_.Exception.Message }
+        try { $r = Invoke-RamTrim -Confirmed; & $step (Get-Text 'Tun.047') 'OK' ((Get-Text 'Tun.048') -f $r.Processes, $(if ($null -ne $r.FreedMB) { (Get-Text 'Tun.049' $($r.FreedMB)) } else { (Get-Text 'Tun.050') })) }
+        catch { & $step (Get-Text 'Tun.051') 'Échec' $_.Exception.Message }
     }
-    Update-DiagProgress $Ctx 65 'Fichiers temporaires…'
+    Update-DiagProgress $Ctx 65 (Get-Text 'Tun.053')
     if ($p.CleanTemp) {
         try {
             $pv = Get-TempCleanupPreview -Ctx $null
             $r = Invoke-TempCleanup -Ctx $null -Files $pv.Files -Roots $pv.Roots -Confirmed
-            & $step 'Fichiers temporaires' 'OK' ("{0} fichier(s) supprimé(s) ({1})" -f $r.Deleted, (Format-Bytes $r.Freed))
-        } catch { & $step 'Fichiers temporaires' 'Échec' $_.Exception.Message }
+            & $step (Get-Text 'Tun.054') 'OK' ((Get-Text 'Tun.055') -f $r.Deleted, (Format-Bytes $r.Freed))
+        } catch { & $step (Get-Text 'Tun.056') 'Échec' $_.Exception.Message }
     }
-    Update-DiagProgress $Ctx 85 'Démarrage…'
+    Update-DiagProgress $Ctx 85 (Get-Text 'Tun.058')
     if ($p.CleanStartup) {
         try {
             $r = Invoke-StartupAutoClean -Confirmed
-            & $step 'Démarrage' 'OK' ("{0} programme(s) désactivé(s)" -f $r.Disabled.Count)
-        } catch { & $step 'Démarrage' 'Échec' $_.Exception.Message }
+            & $step (Get-Text 'Tun.059') 'OK' ((Get-Text 'Tun.060') -f $r.Disabled.Count)
+        } catch { & $step (Get-Text 'Tun.061') 'Échec' $_.Exception.Message }
     }
-    Write-AppLog ("Preset d'optimisation « {0} » : terminé ({1} étape(s))" -f $p.Name, $steps.Count) 'ACTION'
+    Write-AppLog ((Get-Text 'Tun.063') -f $p.Name, $steps.Count) 'ACTION'
     [pscustomobject]@{ Profile = $p; Steps = @($steps) }
 }
 
