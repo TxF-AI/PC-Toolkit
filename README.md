@@ -45,6 +45,21 @@ PC Toolkit n'est pas signé numériquement (un certificat coûte plusieurs centa
 - Si l'écran bleu « Windows a protégé votre ordinateur » apparaît : cliquez **Informations complémentaires** > **Exécuter quand même**.
 - Tout le code est lisible : ce sont des fichiers texte (`.ps1`, `.psm1`, `.xaml`) que vous pouvez ouvrir avec le Bloc-notes avant de lancer quoi que ce soit.
 
+### Scripts non signés et politique d'exécution
+PC Toolkit est un ensemble de scripts PowerShell **non signés**. Windows applique deux protections distinctes :
+
+- **SmartScreen / « Mark of the Web »** : un fichier téléchargé reçoit une marque « venant d'Internet », d'où l'avertissement. Elle se retire avec `Unblock-File` :
+  ```powershell
+  Unblock-File -Path .\PC-Toolkit-v1.5.0.zip
+  ```
+  À faire **avant** d'extraire le zip (ou sur le dossier extrait avec `Get-ChildItem -Recurse | Unblock-File`).
+- **Politique d'exécution PowerShell** : sur certains PC, les scripts sont bloqués (« l'exécution de scripts est désactivée sur ce système »). `Lancer PC Toolkit.cmd` contourne ce blocage pour sa propre session. Si vous lancez les scripts à la main depuis PowerShell, autorisez-les pour la **fenêtre en cours seulement** (rien n'est modifié durablement) :
+  ```powershell
+  Set-ExecutionPolicy RemoteSigned -Scope Process
+  ```
+
+Ces commandes ne touchent ni à Windows Defender ni aux réglages de sécurité du système.
+
 ### Vérifier que le zip n'a pas été modifié
 Le fichier `PC-Toolkit-v<version>.zip.sha256.txt` fourni avec le zip contient son empreinte. Dans PowerShell, dans le dossier du zip :
 ```

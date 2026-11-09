@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Zip, SHA-256 et publication
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vérifier que le tag correspond à VERSION
+        shell: powershell
+        run: |
+          $v = (Get-Content VERSION -TotalCount 1).Trim()
+          if ("v$v" -ne $env:GITHUB_REF_NAME) { throw "Le tag $env:GITHUB_REF_NAME ne correspond pas à VERSION (v$v)." }
+
+      - name: Construire le zip et l'empreinte
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          ./Build-Zip.ps1 -OutDir (Join-Path $PWD 'dist')
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - name: Créer ou mettre à jour la release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $zip = (Get-ChildItem dist -Filter '*.zip').FullName
+          $sha = "$zip.sha256.txt"
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
+          $notes = "SHA-256 de ``$(Split-Path $zip -Leaf)`` : ``$hash```n`nSi SmartScreen s'affiche : ``Unblock-File -Path .\$(Split-Path $zip -Leaf)`` (voir le README). Détail des changements : CHANGELOG.md."
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $zip $sha --clobber
+            gh release edit $tag --notes $notes
+          } else {
+            gh release create $tag $zip $sha --title "PC Toolkit $tag" --notes $notes --verify-tag
+          }
