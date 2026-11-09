@@ -43,7 +43,7 @@ Les deux suites de chiffres et de lettres doivent être identiques. Sinon, le fi
 | Audio | Votre sortie et votre micro **par défaut**, quels qu'ils soient : carte son intégrée (Realtek…), DAC ou interface USB, casque Bluetooth, HDMI, GoXLR, périphérique virtuel. Type de connexion, pilote, fréquences, ASIO, suspension USB, latence indicative |
 | Maintenance | Fichiers temporaires, corbeille, cache DNS, SFC, DISM, CHKDSK, point de restauration |
 | Historique et confidentialité | Fichiers récents et listes de raccourcis, téléchargements inachevés, remise à zéro des compteurs de données réseau (SRUM) |
-| Bilan avant/après | Photo du PC avant et après un nettoyage : espace libéré, RAM, services, processus, fichiers temporaires, périphériques audio fantômes. Export HTML ou TXT |
+| Bilan avant/après | Mesure automatique de chaque nettoyage : espace libéré, RAM, services actifs, fichiers temporaires, périphériques audio fantômes. En mémoire, export HTML ou TXT |
 | Historique | Diagnostics enregistrés, export en rapport HTML ou TXT |
 
 ### Rapports

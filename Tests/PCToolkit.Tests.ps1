@@ -96,68 +96,66 @@ Describe 'Maintenance : garde-fous de suppression' {
     }
 }
 
-Describe 'Bilan avant/après' {
+Describe 'Bilan avant/après (en mémoire)' {
     function New-FakeSnap($o = @{}) {
-        $s = [ordered]@{ Date = '2026-01-01 10:00:00'; IsAdmin = $false; DiskFreeBytes = [long]100GB; RamUsedPct = 50; RamFreeMB = 8000; ServicesRunning = 100; Processes = 200; TempBytes = [long]2GB; RecycleBytes = [long]0; CacheBytes = [long]2GB; AudioActive = 7; AudioGhost = 37 }
+        $s = [ordered]@{ Date = '2026-01-01 10:00:00'; IsAdmin = $false; DiskFreeBytes = [long]100GB; RamUsedPct = 68; RamUsedMB = 21760; ServicesRunning = 142; AudioGhost = 37; TempBytes = [long]2GB; RecycleBytes = [long]0; CacheBytes = [long]2GB }
         foreach ($k in $o.Keys) { $s[$k] = $o[$k] }
         [pscustomobject]$s
     }
     $avant = New-FakeSnap
-    $apres = New-FakeSnap @{ DiskFreeBytes = [long](104.2GB); RamUsedPct = 32; RamFreeMB = 9100; ServicesRunning = 86; Processes = 200; CacheBytes = [long]0; AudioGhost = 0 }
+    $apres = New-FakeSnap @{ DiskFreeBytes = [long](104.6 * 1GB); RamUsedPct = 51; RamUsedMB = 19600; ServicesRunning = 128; AudioGhost = 0; CacheBytes = [long]0 }
     $rows = @(Get-SnapshotComparison -Before $avant -After $apres)
     function Get-Row([string]$Pattern) { $rows | Where-Object { $_.Indicateur -like $Pattern } }
 
-    It 'Une ligne par indicateur' { $rows.Count | Should Be 8 }
-    It 'Espace disque : gain en Go libérés' {
-        (Get-Row 'Espace libre*').Status | Should Be 'OK'
-        (Get-Row 'Espace libre*').Gain | Should Match '^\+4[,.]2 Go libérés$'
+    It 'Les 5 indicateurs demandés' {
+        $rows.Count | Should Be 5
+        ($rows.Indicateur -join '|') | Should Match 'Disque .* libre\|RAM utilisée\|Services actifs\|Périphériques audio fantômes\|Fichiers temporaires'
     }
-    It 'RAM : occupation en baisse = amélioration' {
-        (Get-Row 'RAM utilisée').Gain | Should Match '^-18 points'
-        (Get-Row 'RAM utilisée').Status | Should Be 'OK'
+    It 'Disque : gain en Go' {
+        (Get-Row 'Disque*').Gain | Should Match '^\+4[,.]6 Go$'
+        (Get-Row 'Disque*').Status | Should Be 'OK'
     }
-    It 'Services arrêtés et périphériques purgés' {
-        (Get-Row 'Services*').Gain | Should Match '^-14 service\(s\) arrêté\(s\)$'
-        (Get-Row '*fantômes').Gain | Should Match '^-37 fantôme\(s\) purgé\(s\)$'
+    It 'RAM : pourcentage et Go' {
+        (Get-Row 'RAM*').Avant | Should Match '^68 % \(21[,.]3 Go\)$'
+        (Get-Row 'RAM*').Gain | Should Match '^-17 % \(-2[,.]1 Go\)$'
+        (Get-Row 'RAM*').Status | Should Be 'OK'
+    }
+    It 'Services et fantômes purgés' {
+        (Get-Row 'Services*').Gain | Should Be '-14 services'
+        (Get-Row '*fantômes').Gain | Should Be '-37 fantômes'
+        (Get-Row 'Fichiers*').Gain | Should Match '^-2[,.]0 Go$'
     }
     It 'Valeur identique = Aucun changement (neutre)' {
-        (Get-Row 'Processus').Gain | Should Be 'Aucun changement'
-        (Get-Row 'Processus').Status | Should Be 'Info'
+        $r = @(Get-SnapshotComparison -Before $avant -After $avant) | Where-Object { $_.Indicateur -like 'Services*' }
+        $r.Gain | Should Be 'Aucun changement'
+        $r.Status | Should Be 'Info'
     }
     It 'Dégradation signalée (Warn)' {
-        $r = @(Get-SnapshotComparison -Before $avant -After (New-FakeSnap @{ Processes = 250 })) | Where-Object { $_.Indicateur -eq 'Processus' }
+        $r = @(Get-SnapshotComparison -Before $avant -After (New-FakeSnap @{ ServicesRunning = 143 })) | Where-Object { $_.Indicateur -like 'Services*' }
         $r.Status | Should Be 'Warn'
-        $r.Gain | Should Match '^\+50 processus de plus$'
+        $r.Gain | Should Be '+1 service'
     }
     It 'Mesure manquante : Non disponible, jamais inventée' {
-        $r = @(Get-SnapshotComparison -Before $avant -After (New-FakeSnap @{ DiskFreeBytes = $null; AudioGhost = $null })) | Where-Object { $_.Indicateur -like 'Espace libre*' -or $_.Indicateur -like '*fantômes' }
+        $r = @(Get-SnapshotComparison -Before $avant -After (New-FakeSnap @{ DiskFreeBytes = $null; AudioGhost = $null })) | Where-Object { $_.Indicateur -like 'Disque*' -or $_.Indicateur -like '*fantômes' }
         @($r | Where-Object { $_.Status -eq 'NA' -and $_.Gain -eq 'Non disponible' -and $_.Apres -eq 'Non disponible' }).Count | Should Be 2
     }
-    It 'Le résultat contient le tableau Avant / Après / Gain net' {
-        $res = New-BilanResult -Before $avant -After $apres
+    It 'Résultat standard : tableau Indicateur / Avant / Après / Gain net, exportable' {
+        $res = New-BilanResult -Before $avant -After $apres -Operation 'test'
         $res.Module | Should Be 'Bilan'
         $res.Sections.Count | Should Be 2
         ($res.Sections[1].Tables[0].Columns -join '|') | Should Be 'Indicateur|Avant|Après|Gain net'
-        $res.Sections[1].Tables[0].Rows.Count | Should Be 8
+        $res.Sections[1].Tables[0].Rows.Count | Should Be 5
+        $txt = (Format-TextTable $res.Sections[1].Tables[0]) -join "`n"
+        $txt | Should Match 'Gain net'
     }
-    It 'La photo réelle est lisible (types plausibles, lecture seule)' {
+    It 'La photo réelle est lisible et n''écrit aucun fichier' {
+        $dir = Join-Path $Root 'Data\Snapshots'
         $s = Get-SystemSnapshot -Ctx $null
         $s.Date | Should Not BeNullOrEmpty
         $s.DiskFreeBytes | Should BeGreaterThan 0
         $s.RamUsedPct | Should BeLessThan 101
-        $s.Processes | Should BeGreaterThan 0
-    }
-    It 'Enregistrement et relecture d''une photo (dossier de test, pas celui de l''utilisateur)' {
-        $global:BilanTestRoot = $TestDrive
-        try {
-            InModuleScope Core { $script:RootSauve = $script:AppRoot; $script:AppRoot = $global:BilanTestRoot }
-            [void](Save-SystemSnapshot $apres 'avant')
-            (Get-SavedSnapshot 'avant').ServicesRunning | Should Be 86
-            Test-Path (Join-Path $TestDrive 'Data\Snapshots\avant.json') | Should Be $true
-        } finally {
-            InModuleScope Core { $script:AppRoot = $script:RootSauve }
-            Remove-Variable BilanTestRoot -Scope Global -ErrorAction SilentlyContinue
-        }
+        $s.ServicesRunning | Should BeGreaterThan 0
+        Test-Path $dir | Should Be $false
     }
 }
 

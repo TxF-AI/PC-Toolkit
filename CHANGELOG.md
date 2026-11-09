@@ -3,9 +3,9 @@
 ## En préparation (pas encore dans le zip)
 
 **Bilan avant/après**
-- Nouvelle page : photo du PC avant, nettoyage avec les outils existants (aperçu et confirmation), photo après, puis tableau `INDICATEUR | AVANT | APRÈS | GAIN NET`.
-- Mesures : espace libre sur C:, RAM utilisée et disponible, services en cours, processus, fichiers temporaires + corbeille, périphériques audio actifs et fantômes. Une mesure indisponible s'affiche « Non disponible ».
-- Export HTML et TXT comme les autres pages, enregistrement dans l'historique.
+- Chaque nettoyage confirmé dans Maintenance (fichiers temporaires, corbeille, fichiers récents, téléchargements inachevés) est mesuré automatiquement : photo avant, photo après, puis tableau `INDICATEUR | AVANT | APRÈS | GAIN NET` dans la nouvelle page « Bilan avant/après ».
+- Mesures : espace libre sur C:, RAM utilisée (% et Go), services actifs, périphériques audio fantômes, fichiers temporaires + corbeille. Une mesure indisponible s'affiche « Non disponible ».
+- Tout reste en mémoire (aucun fichier créé). Export HTML et TXT comme les autres pages. Deux boutons permettent aussi une mesure manuelle (script de confidentialité, nettoyage audio…).
 
 ## 1.1.0
 

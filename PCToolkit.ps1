@@ -85,7 +85,7 @@ $script:Pages = [ordered]@{
     Storage     = @{ Nav = 'NavStorage';     Title = 'Stockage';        Fn = 'Invoke-StorageDiagnostic';   Desc = 'Espace libre, santé des disques, dossiers volumineux et recherche de gros fichiers. Rien n''est supprimé.'; Opt = 'OptStorage' }
     Audio       = @{ Nav = 'NavAudio';       Title = 'Audio';           Fn = 'Invoke-AudioDiagnostic';     Desc = 'Votre sortie et votre micro par défaut (carte son, USB, Bluetooth, HDMI…) : connexion, pilote, fréquences d''échantillonnage, ASIO, latence indicative.' }
     Maintenance = @{ Nav = 'NavMaintenance'; Title = 'Maintenance';     Custom = $true;                    Desc = 'Vérifications et nettoyage contrôlé. Chaque action qui modifie le système demande votre confirmation.' }
-    Bilan       = @{ Nav = 'NavBilan';       Title = 'Bilan avant/après'; Custom = $true;                  Desc = 'Prenez une photo du PC, nettoyez, puis comparez : espace libéré, RAM, services, processus, fichiers temporaires et périphériques audio fantômes.' }
+    Bilan       = @{ Nav = 'NavBilan';       Title = 'Bilan avant/après'; Custom = $true;                  Desc = 'Chaque nettoyage lancé depuis Maintenance est mesuré automatiquement : espace libéré, RAM, services actifs, fichiers temporaires et périphériques audio fantômes.' }
     History     = @{ Nav = 'NavHistory';    Title = 'Historique';      Custom = $true;                    Desc = 'Diagnostics précédents : réouverture, comparaison et export HTML.' }
 }
 $script:CurrentPage = 'Dashboard'
@@ -391,10 +391,11 @@ function Invoke-MaintenanceTool([string]$Id) {
                     if ($pv.Count -eq 0) { Show-Message 'Aucun fichier temporaire ancien à supprimer.' 'Fichiers temporaires'; return }
                     $msg = "{0:N0} fichier(s) temporaire(s) de plus de 2 jours, soit {1}.`n`nDossiers : {2}`n`nIls seront supprimés définitivement (pas de passage par la corbeille). Les fichiers en cours d'utilisation seront ignorés.`n`nSupprimer ces fichiers ?" -f $pv.Count, (Format-Bytes $pv.Bytes), (@($pv.Roots) -join ', ')
                     if (-not (Confirm-Action $msg 'Nettoyer les fichiers temporaires')) { return }
+                    Start-BilanCapture 'fichiers temporaires'
                     Start-BackgroundJob -Function 'Invoke-TempCleanup' -Params @{ Files = [string[]]@($pv.Files); Roots = [string[]]@($pv.Roots); Confirmed = $true } -StartText 'Suppression des fichiers temporaires…' -OnComplete {
                         param($o2, $e2)
                         $res = @($o2) | Where-Object { $_ -and $_.PSObject.Properties['Deleted'] } | Select-Object -Last 1
-                        if ($res) { Show-Message ("{0:N0} fichier(s) supprimé(s), {1} libéré(s).`n{2:N0} fichier(s) ignoré(s) (en cours d'utilisation ou protégés)." -f $res.Deleted, (Format-Bytes $res.Freed), $res.Skipped) 'Nettoyage terminé' }
+                        if ($res) { Show-Message ("{0:N0} fichier(s) supprimé(s), {1} libéré(s).`n{2:N0} fichier(s) ignoré(s) (en cours d'utilisation ou protégés)." -f $res.Deleted, (Format-Bytes $res.Freed), $res.Skipped) 'Nettoyage terminé'; Complete-Bilan }
                         else { Show-Message ("Le nettoyage a échoué.`n" + ($e2 -join "`n")) 'Erreur' 'Error' }
                     }
                 }
@@ -403,8 +404,10 @@ function Invoke-MaintenanceTool([string]$Id) {
                 $rb = Get-RecycleBinSize
                 if ($rb.Count -eq 0) { Show-Message 'La corbeille est déjà vide.' 'Corbeille'; return }
                 if (Confirm-Action ("La corbeille contient {0} élément(s) pour {1}.`n`nLa vider définitivement ? Cette action est irréversible." -f $rb.Count, (Format-Bytes $rb.Bytes)) 'Vider la corbeille') {
+                    Start-BilanCapture 'corbeille'
                     [void](Clear-RecycleBinConfirmed -Confirmed)
                     Show-Message ('Corbeille vidée : {0} libérés.' -f (Format-Bytes $rb.Bytes)) 'Corbeille'
+                    Complete-Bilan
                 }
             }
             'dns' {
@@ -486,10 +489,11 @@ function Invoke-PreviewThenDelete([string]$PreviewFn) {
         if (-not $pv) { Show-Message ("Analyse impossible.`n" + ($errs -join "`n")) $ctx.Title 'Error'; return }
         if (@($pv.Files).Count -eq 0) { Show-Message $ctx.Empty $ctx.Title; return }
         if (-not (Confirm-Action (& $ctx.Message $pv) $ctx.Title)) { return }
+        Start-BilanCapture $ctx.Title.ToLower()
         Start-BackgroundJob -Function 'Remove-FilesUnder' -Params @{ Files = [string[]]@($pv.Files); Root = [string]$pv.Root; Label = $ctx.Title; Confirmed = $true } -StartText "Nettoyage : $($ctx.Title)…" -OnComplete {
             param($o2, $e2)
             $res = @($o2) | Where-Object { $_ -and $_.PSObject.Properties['Deleted'] } | Select-Object -Last 1
-            if ($res) { Show-Message ("{0:N0} élément(s) supprimé(s) ({1}).`n{2:N0} ignoré(s) (en cours d'utilisation ou protégés)." -f $res.Deleted, (Format-Bytes $res.Freed), $res.Skipped) "$($script:Pending.Title) — terminé" }
+            if ($res) { Show-Message ("{0:N0} élément(s) supprimé(s) ({1}).`n{2:N0} ignoré(s) (en cours d'utilisation ou protégés)." -f $res.Deleted, (Format-Bytes $res.Freed), $res.Skipped) "$($script:Pending.Title) — terminé"; Complete-Bilan }
             else { Show-Message ("Le nettoyage a échoué.`n" + ($e2 -join "`n")) 'Erreur' 'Error' }
         }
     }
@@ -541,81 +545,73 @@ function Show-MaintenancePage {
 
 #region Page Bilan avant/après ----------------------------------------------------------------
 
-function Invoke-BilanSnapshot([string]$Which) {
-    $script:BilanWhich = $Which
-    $txt = if ($Which -eq 'avant') { 'Photo « avant » en cours…' } else { 'Photo « après » en cours…' }
-    Start-BackgroundJob -Function 'Get-SystemSnapshot' -StartText $txt -OnComplete {
-        param($out, $errs)
-        $snap = @($out) | Where-Object { $_ -and $_.PSObject.Properties['DiskFreeBytes'] } | Select-Object -Last 1
-        if (-not $snap) { Show-Message ("La photo du système n'a pas pu être prise.`n" + ($errs -join "`n")) 'Bilan' 'Error'; return }
-        try {
-            if ($script:BilanWhich -eq 'avant') {
-                [void](Save-SystemSnapshot $snap 'avant')
-                $script:Results.Remove('Bilan')
-            } else {
-                $avant = Get-SavedSnapshot 'avant'
-                if (-not $avant) { Show-Message 'Prenez d''abord la photo « avant ».' 'Bilan'; return }
-                [void](Save-SystemSnapshot $snap 'apres')
-                $res = New-BilanResult -Before $avant -After $snap
-                $script:Results['Bilan'] = $res
-                try { [void](Save-DiagHistory $res) } catch { Write-AppLog "Historique : $($_.Exception.Message)" 'ERROR' }
-                $UI.BtnExport.IsEnabled = $true
-            }
-        } catch {
-            Write-AppLog "Bilan : $($_.Exception.Message)" 'ERROR'
-            Show-Message "Bilan impossible : $($_.Exception.Message)" 'Bilan' 'Error'
-        }
-        if ($script:CurrentPage -eq 'Bilan') { Show-BilanPage }
+# Photos gardées uniquement en mémoire (aucun fichier). La photo « avant » est prise automatiquement
+# quand un nettoyage vient d'être confirmé ; la photo « après » et le tableau suivent à la fin.
+$script:BilanAvant = $null
+$script:BilanOperation = ''
+
+function Get-SnapshotNow {
+    $old = $Window.Cursor
+    try { $Window.Cursor = [Windows.Input.Cursors]::Wait; Get-SystemSnapshot -Ctx $null }
+    catch { Write-AppLog "Bilan : $($_.Exception.Message)" 'ERROR'; $null }
+    finally { $Window.Cursor = $old }
+}
+
+function Start-BilanCapture([string]$Operation = '') {
+    $script:BilanAvant = Get-SnapshotNow
+    $script:BilanOperation = $Operation
+}
+
+function Complete-Bilan {
+    if (-not $script:BilanAvant) { return }
+    $apres = Get-SnapshotNow
+    if (-not $apres) { return }
+    try {
+        $script:Results['Bilan'] = New-BilanResult -Before $script:BilanAvant -After $apres -Operation $script:BilanOperation
+        $script:BilanAvant = $null
+        if ($script:CurrentPage -eq 'Bilan') { Show-BilanPage; $UI.BtnExport.IsEnabled = $true }
+        else { $UI.NavBilan.IsChecked = $true }
+    } catch {
+        Write-AppLog "Bilan : $($_.Exception.Message)" 'ERROR'
+        Show-Message "Bilan impossible : $($_.Exception.Message)" 'Bilan' 'Error'
     }
 }
 
 function Show-BilanPage {
     $UI.ResultsPanel.Children.Clear()
     $script:BusyDisable.Clear()
-    $avant = Get-SavedSnapshot 'avant'
-
-    $addStep = {
-        param([string]$Num, [string]$Title, [string]$Desc, $Buttons)
-        $card = New-Card 10
-        $sp = New-Object Windows.Controls.StackPanel
-        $h = New-Text ("ÉTAPE $Num · " + $Title.ToUpper()) 12 '#FF8A95' 'SemiBold'; $h.FontFamily = 'Bahnschrift SemiBold, Segoe UI Semibold'
-        [void]$sp.Children.Add($h)
-        $d = New-Text $Desc 12.5 '#C9B8BC' -Wrap; $d.Margin = '0,6,0,10'
-        [void]$sp.Children.Add($d)
-        $wp = New-Object Windows.Controls.WrapPanel
-        foreach ($b in $Buttons) {
-            $btn = New-Object Windows.Controls.Button
-            $btn.Style = $Window.FindResource($b.Style)
-            $btn.Content = $b.Text; $btn.Margin = '0,0,10,6'; $btn.Tag = $b.Id
-            $btn.IsEnabled = -not $script:Job
-            [Windows.Automation.AutomationProperties]::SetAutomationId($btn, "Bilan_$($b.Id)")
-            $btn.Add_Click({
-                param($s, $e)
-                switch ([string]$s.Tag) {
-                    'avant' { Invoke-BilanSnapshot 'avant' }
-                    'apres' { Invoke-BilanSnapshot 'apres' }
-                    'temp' { Invoke-MaintenanceTool 'temp' }
-                    'recycle' { Invoke-MaintenanceTool 'recycle' }
-                    'maint' { $UI.NavMaintenance.IsChecked = $true }
-                }
-            })
-            [void]$script:BusyDisable.Add($btn)
-            [void]$wp.Children.Add($btn)
-        }
-        [void]$sp.Children.Add($wp)
-        $card.Child = $sp
-        [void]$UI.ResultsPanel.Children.Add($card)
+    $card = New-Card 10
+    $sp = New-Object Windows.Controls.StackPanel
+    $h = New-Text 'BILAN AUTOMATIQUE' 12 '#FF8A95' 'SemiBold'; $h.FontFamily = 'Bahnschrift SemiBold, Segoe UI Semibold'
+    [void]$sp.Children.Add($h)
+    $txt = 'Chaque nettoyage confirmé depuis « Maintenance » (fichiers temporaires, corbeille, fichiers récents, téléchargements inachevés) prend une photo du PC avant de commencer et une autre à la fin, puis affiche ici le tableau comparatif. Rien n''est enregistré : tout reste en mémoire. Pour mesurer autre chose (script de confidentialité, nettoyage audio…), utilisez les deux boutons ci-dessous.'
+    $d = New-Text $txt 12.5 '#C9B8BC' -Wrap; $d.Margin = '0,6,0,10'
+    [void]$sp.Children.Add($d)
+    if ($script:BilanAvant) {
+        $st = New-Text ("Photo « avant » prise à {0}. Faites votre nettoyage puis cliquez sur « Comparer maintenant »." -f $script:BilanAvant.Date.Substring(11)) 12.5 '#3DDC84' -Wrap
+        $st.Margin = '0,0,0,10'; [void]$sp.Children.Add($st)
     }
-
-    $etat = if ($avant) { "Photo « avant » enregistrée le $($avant.Date)." } else { 'Aucune photo « avant » pour le moment.' }
-    & $addStep '1' 'Photo avant' ("Enregistre l'état actuel du PC (lecture seule, environ 5 secondes). $etat") @(
-        @{ Id = 'avant'; Text = $(if ($avant) { 'Refaire la photo avant' } else { 'Prendre la photo avant' }); Style = 'AccentButton' })
-    & $addStep '2' 'Optimiser' ("Lancez vos nettoyages : chacun affiche un aperçu et demande votre confirmation. Les autres optimisations (script de confidentialité Outils\Confidentialite-Debloat-Win11.ps1, nettoyage des périphériques audio fantômes) se lancent à part ; leur effet apparaîtra dans la photo « après ».") @(
-        @{ Id = 'temp'; Text = 'Fichiers temporaires…'; Style = 'GhostButton' }
-        @{ Id = 'recycle'; Text = 'Vider la corbeille…'; Style = 'GhostButton' }
-        @{ Id = 'maint'; Text = 'Tous les outils de maintenance'; Style = 'GhostButton' })
-    & $addStep '3' 'Photo après et comparaison' 'Reprend la photo et calcule les gains nets. Le résultat s''exporte en HTML ou TXT avec les boutons en haut.' @(
-        @{ Id = 'apres'; Text = 'Comparer avec la photo avant'; Style = $(if ($avant) { 'AccentButton' } else { 'GhostButton' }) })
+    $wp = New-Object Windows.Controls.WrapPanel
+    foreach ($b in @(
+            @{ Id = 'avant'; Text = 'Prendre la photo avant'; Style = $(if ($script:BilanAvant) { 'GhostButton' } else { 'AccentButton' }) }
+            @{ Id = 'apres'; Text = 'Comparer maintenant'; Style = $(if ($script:BilanAvant) { 'AccentButton' } else { 'GhostButton' }) })) {
+        $btn = New-Object Windows.Controls.Button
+        $btn.Style = $Window.FindResource($b.Style)
+        $btn.Content = $b.Text; $btn.Margin = '0,0,10,6'; $btn.Tag = $b.Id
+        $btn.IsEnabled = -not $script:Job
+        [Windows.Automation.AutomationProperties]::SetAutomationId($btn, "Bilan_$($b.Id)")
+        $btn.Add_Click({
+            param($s, $e)
+            if ([string]$s.Tag -eq 'avant') { Start-BilanCapture 'mesure manuelle'; Show-BilanPage }
+            elseif (-not $script:BilanAvant) { Show-Message 'Prenez d''abord la photo « avant ».' 'Bilan' }
+            else { Complete-Bilan }
+        })
+        [void]$script:BusyDisable.Add($btn)
+        [void]$wp.Children.Add($btn)
+    }
+    [void]$sp.Children.Add($wp)
+    $card.Child = $sp
+    [void]$UI.ResultsPanel.Children.Add($card)
 
     $res = $script:Results['Bilan']
     if ($res) {

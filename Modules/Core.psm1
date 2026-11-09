@@ -15,9 +15,8 @@ $script:AppRoot = Split-Path $PSScriptRoot -Parent
 
 function Get-AppPath {
     <# Renvoie un dossier de l'application (créé s'il n'existe pas). #>
-    param([ValidateSet('Root', 'History', 'Reports', 'Logs', 'Snapshots')][string]$Kind = 'Root')
+    param([ValidateSet('Root', 'History', 'Reports', 'Logs')][string]$Kind = 'Root')
     $p = switch ($Kind) {
-        'Snapshots' { Join-Path $script:AppRoot 'Data\Snapshots' }
         'Root'    { $script:AppRoot }
         'History' { Join-Path $script:AppRoot 'Data\History' }
         'Reports' { Join-Path $script:AppRoot 'Reports' }
