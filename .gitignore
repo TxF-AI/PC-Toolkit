@@ -12,3 +12,11 @@ Outils/Sauvegardes/
 
 
 HANDOFF.md
+
+# Graphify Output & Cache (graphify-out/ est deja ignore plus haut)
+graph.html
+graph.json
+GRAPH_REPORT.md
+.graphify*
+# ... sauf le fichier de configuration versionne
+!.graphifyignore
