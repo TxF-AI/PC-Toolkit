@@ -1,0 +1,8 @@
+# Données personnelles de l'utilisateur (historique, journaux, rapports)
+Data/
+Reports/
+# Graphe graphify : se régénère avec « graphify update . »
+graphify-out/
+# Zips fabriqués par Build-Zip.ps1
+*.zip
+*.zip.sha256.txt

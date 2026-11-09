@@ -1,0 +1,396 @@
+﻿<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="PC Toolkit — Maintenance &amp; Diagnostic" Width="1300" Height="840" MinWidth="1020" MinHeight="640"
+        WindowStartupLocation="CenterScreen" Background="#0B0709" Foreground="#F2E6E8"
+        FontFamily="Segoe UI Variable Text, Segoe UI" FontSize="13" UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display">
+    <Window.Resources>
+        <!-- Palette -->
+        <SolidColorBrush x:Key="Accent" Color="#FF2A3D"/>
+        <SolidColorBrush x:Key="AccentSoft" Color="#FF8A95"/>
+        <SolidColorBrush x:Key="Card" Color="#150A0D"/>
+        <SolidColorBrush x:Key="Line" Color="#2E1016"/>
+        <SolidColorBrush x:Key="Muted" Color="#9C8A8E"/>
+        <FontFamily x:Key="Display">Bahnschrift SemiBold, Segoe UI Semibold</FontFamily>
+        <FontFamily x:Key="Icons">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+
+        <!-- Navigation -->
+        <Style x:Key="NavButton" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="#C9B8BC"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="8" Padding="12,9">
+                            <Grid>
+                                <Border x:Name="Bar" Width="3" CornerRadius="2" Background="{StaticResource Accent}" HorizontalAlignment="Left" Margin="-12,2,0,2" Visibility="Collapsed">
+                                    <Border.Effect><DropShadowEffect Color="#FF2A3D" BlurRadius="10" ShadowDepth="0" Opacity="0.9"/></Border.Effect>
+                                </Border>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="Ic" Text="{TemplateBinding Tag}" FontFamily="{StaticResource Icons}" FontSize="16" Width="28" VerticalAlignment="Center"/>
+                                    <ContentPresenter VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#1C0D11"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#2A0C13"/>
+                                <Setter TargetName="Bar" Property="Visibility" Value="Visible"/>
+                                <Setter TargetName="Ic" Property="Foreground" Value="#FF2A3D"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Boutons -->
+        <Style x:Key="AccentButton" TargetType="Button">
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="16,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="#E01E31" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#FF2A3D"/>
+                                <Setter TargetName="Bd" Property="Effect"><Setter.Value><DropShadowEffect Color="#FF2A3D" BlurRadius="16" ShadowDepth="0" Opacity="0.8"/></Setter.Value></Setter>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="Bd" Property="Background" Value="#B3192A"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Bd" Property="Opacity" Value="0.35"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="GhostButton" TargetType="Button">
+            <Setter Property="Foreground" Value="#E6D6DA"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="14,7"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="#120709" BorderBrush="#3A141B" BorderThickness="1" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#FF2A3D"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#1E0B10"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Bd" Property="Opacity" Value="0.35"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="Chip" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="#C9B8BC"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd" Background="#120709" BorderBrush="#3A141B" BorderThickness="1" CornerRadius="14" Padding="12,4">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="#7A1F2B"/></Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#3A0A12"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="#FF2A3D"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Barre de progression néon -->
+        <Style TargetType="ProgressBar">
+            <Setter Property="Height" Value="6"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid>
+                            <Border x:Name="PART_Track" CornerRadius="3" Background="#24101A"/>
+                            <Border x:Name="PART_Indicator" CornerRadius="3" Background="#FF2A3D" HorizontalAlignment="Left">
+                                <Border.Effect><DropShadowEffect Color="#FF2A3D" BlurRadius="12" ShadowDepth="0" Opacity="0.9"/></Border.Effect>
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Case à cocher -->
+        <Style TargetType="CheckBox">
+            <Setter Property="Foreground" Value="#B8A6AB"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal" Background="Transparent">
+                            <Border x:Name="Box" Width="16" Height="16" CornerRadius="4" BorderThickness="1" BorderBrush="#5A1F2A" Background="#120709" VerticalAlignment="Center">
+                                <TextBlock x:Name="Mark" Text="&#xE73E;" FontFamily="{StaticResource Icons}" FontSize="11" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+                            </Border>
+                            <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Box" Property="Background" Value="#E01E31"/>
+                                <Setter TargetName="Box" Property="BorderBrush" Value="#FF2A3D"/>
+                                <Setter TargetName="Mark" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Box" Property="BorderBrush" Value="#FF2A3D"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Champ texte -->
+        <Style TargetType="TextBox">
+            <Setter Property="Foreground" Value="#F2E6E8"/>
+            <Setter Property="CaretBrush" Value="#FF2A3D"/>
+            <Setter Property="SelectionBrush" Value="#FF2A3D"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="Bd" Background="#120709" BorderBrush="#3A141B" BorderThickness="1" CornerRadius="6" Padding="8,4">
+                            <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Bd" Property="BorderBrush" Value="#FF2A3D"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Info-bulles -->
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="#1A0C10"/>
+            <Setter Property="Foreground" Value="#F2E6E8"/>
+            <Setter Property="BorderBrush" Value="#FF2A3D"/>
+            <Setter Property="MaxWidth" Value="420"/>
+        </Style>
+
+        <!-- Barres de défilement fines -->
+        <Style x:Key="ThumbStyle" TargetType="Thumb">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb"><Border CornerRadius="4" Background="#4A1A24"/></ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="MinWidth" Value="10"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True" Orientation="{TemplateBinding Orientation}">
+                                <Track.Thumb><Thumb Style="{StaticResource ThumbStyle}" Margin="2"/></Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Width" Value="Auto"/>
+                    <Setter Property="MinWidth" Value="0"/>
+                    <Setter Property="Height" Value="10"/>
+                    <Setter Property="MinHeight" Value="10"/>
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="ScrollBar">
+                                <Grid Background="Transparent">
+                                    <Track x:Name="PART_Track" Orientation="{TemplateBinding Orientation}">
+                                        <Track.Thumb><Thumb Style="{StaticResource ThumbStyle}" Margin="2"/></Track.Thumb>
+                                    </Track>
+                                </Grid>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Tableaux -->
+        <Style TargetType="DataGrid">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#E6D6DA"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="RowBackground" Value="#140A0D"/>
+            <Setter Property="AlternatingRowBackground" Value="#190C10"/>
+            <Setter Property="GridLinesVisibility" Value="None"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="SelectionUnit" Value="FullRow"/>
+            <Setter Property="ClipboardCopyMode" Value="IncludeHeader"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#1F0C12"/>
+            <Setter Property="Foreground" Value="#FF8A95"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="BorderBrush" Value="#2E1016"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+        </Style>
+        <Style TargetType="DataGridCell">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="DataGridCell">
+                        <Border Padding="8,4" Background="{TemplateBinding Background}"><ContentPresenter/></Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#3A0A12"/>
+                    <Setter Property="Foreground" Value="#FFFFFF"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="236"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- ===================== Barre latérale ===================== -->
+        <Border Grid.Column="0" Background="#0F0608" BorderBrush="#26090F" BorderThickness="0,0,1,0">
+            <DockPanel Margin="14,22,14,16">
+                <StackPanel DockPanel.Dock="Top" Margin="8,0,0,24">
+                    <TextBlock FontFamily="{StaticResource Display}" FontSize="25" Foreground="#FF2A3D"><Run Text="&#x26A1;" FontFamily="Segoe UI Symbol" FontSize="29" FontWeight="Bold"/><Run Text=" PC//TOOLKIT"/>
+                        <TextBlock.Effect><DropShadowEffect Color="#FF2A3D" BlurRadius="18" ShadowDepth="0" Opacity="0.85"/></TextBlock.Effect>
+                    </TextBlock>
+                    <TextBlock Text="maintenance · diagnostic" Foreground="{StaticResource Muted}" FontSize="11" Margin="1,2,0,0"/>
+                    <TextBlock x:Name="TxtMachine" Foreground="#6E5C61" FontSize="11" Margin="1,10,0,0" TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Bottom">
+                    <Border x:Name="AdminBadge" CornerRadius="8" Padding="10,7" Background="#170A0E" BorderBrush="#2E1016" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="AdminIcon" Text="&#xEA18;" FontFamily="{StaticResource Icons}" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock x:Name="TxtAdmin" VerticalAlignment="Center" FontSize="12"/>
+                        </StackPanel>
+                    </Border>
+                    <Button x:Name="BtnElevate" Style="{StaticResource GhostButton}" Margin="0,8,0,0" ToolTip="Certaines mesures (SMART, températures disque, Temp Windows) nécessitent les droits administrateur.">
+                        <TextBlock Text="Relancer en administrateur" FontSize="12"/>
+                    </Button>
+                    <TextBlock x:Name="TxtVersion" Text="lecture seule par défaut" Foreground="#5A4A4F" FontSize="10.5" Margin="4,12,0,0"/>
+                </StackPanel>
+
+                <StackPanel>
+                    <TextBlock Text="DIAGNOSTICS" Foreground="#6E5C61" FontSize="10.5" FontWeight="SemiBold" Margin="10,0,0,6"/>
+                    <RadioButton x:Name="NavDashboard" GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE80F;" Content="Tableau de bord" IsChecked="True"/>
+                    <RadioButton x:Name="NavHardware"  GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE950;" Content="Matériel"/>
+                    <RadioButton x:Name="NavNetwork"   GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE968;" Content="Réseau"/>
+                    <RadioButton x:Name="NavWindows"   GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE9D9;" Content="Windows"/>
+                    <RadioButton x:Name="NavStorage"   GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xEDA2;" Content="Stockage"/>
+                    <RadioButton x:Name="NavAudio"     GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE8D6;" Content="Audio"/>
+                    <TextBlock Text="OUTILS" Foreground="#6E5C61" FontSize="10.5" FontWeight="SemiBold" Margin="10,18,0,6"/>
+                    <RadioButton x:Name="NavMaintenance" GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE90F;" Content="Maintenance"/>
+                    <RadioButton x:Name="NavHistory"     GroupName="Nav" Style="{StaticResource NavButton}" Tag="&#xE81C;" Content="Historique"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- ===================== Contenu ===================== -->
+        <Grid Grid.Column="1" Margin="30,24,30,18">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- En-tête -->
+            <DockPanel Grid.Row="0" LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right" VerticalAlignment="Top">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button x:Name="BtnBack" Style="{StaticResource GhostButton}" Margin="0,0,8,0" Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE72B;" FontFamily="{StaticResource Icons}" Margin="0,1,8,0"/><TextBlock Text="Retour"/></StackPanel>
+                    </Button>
+                    <Button x:Name="BtnExport" Style="{StaticResource GhostButton}" Margin="0,0,6,0" IsEnabled="False" ToolTip="Rapport mis en forme, à ouvrir dans le navigateur">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xEDE1;" FontFamily="{StaticResource Icons}" Margin="0,1,8,0"/><TextBlock Text="HTML"/></StackPanel>
+                    </Button>
+                    <Button x:Name="BtnExportTxt" Style="{StaticResource GhostButton}" Margin="0,0,8,0" IsEnabled="{Binding IsEnabled, ElementName=BtnExport}" Visibility="{Binding Visibility, ElementName=BtnExport}" ToolTip="Rapport en texte brut, facile à copier-coller (Discord, forum…)">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE8A5;" FontFamily="{StaticResource Icons}" Margin="0,1,8,0"/><TextBlock Text="TXT"/></StackPanel>
+                    </Button>
+                    <Button x:Name="BtnCancel" Style="{StaticResource GhostButton}" Margin="0,0,8,0" Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE711;" FontFamily="{StaticResource Icons}" Margin="0,1,8,0"/><TextBlock Text="Annuler"/></StackPanel>
+                    </Button>
+                    <Button x:Name="BtnRun" Style="{StaticResource AccentButton}">
+                        <StackPanel Orientation="Horizontal"><TextBlock Text="&#xE768;" FontFamily="{StaticResource Icons}" Margin="0,1,8,0"/><TextBlock x:Name="TxtRun" Text="Lancer le diagnostic"/></StackPanel>
+                    </Button>
+                </StackPanel>
+                <CheckBox x:Name="ChkNotepad" Content="Ouvrir le TXT dans le Bloc-notes" IsChecked="True" Visibility="{Binding Visibility, ElementName=BtnExport}" HorizontalAlignment="Right" Margin="0,8,2,0" FontSize="12"/>
+                </StackPanel>
+                <StackPanel>
+                    <TextBlock x:Name="TxtTitle" FontFamily="{StaticResource Display}" FontSize="28" Foreground="#FFFFFF"/>
+                    <TextBlock x:Name="TxtDesc" Foreground="{StaticResource Muted}" Margin="0,2,20,0" TextWrapping="Wrap"/>
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Options propres à certaines pages -->
+            <StackPanel Grid.Row="1" Margin="0,14,0,0">
+                <StackPanel x:Name="OptNetwork" Orientation="Horizontal" Visibility="Collapsed">
+                    <TextBlock Text="Durée du test de ping :" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <RadioButton x:Name="Dur15"  GroupName="Dur" Style="{StaticResource Chip}" Content="15 s"/>
+                    <RadioButton x:Name="Dur30"  GroupName="Dur" Style="{StaticResource Chip}" Content="30 s" IsChecked="True"/>
+                    <RadioButton x:Name="Dur60"  GroupName="Dur" Style="{StaticResource Chip}" Content="1 min"/>
+                    <RadioButton x:Name="Dur180" GroupName="Dur" Style="{StaticResource Chip}" Content="3 min"/>
+                </StackPanel>
+                <StackPanel x:Name="OptWindows" Orientation="Horizontal" Visibility="Collapsed">
+                    <TextBlock Text="Période analysée :" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <RadioButton x:Name="Days1"  GroupName="Days" Style="{StaticResource Chip}" Content="24 h"/>
+                    <RadioButton x:Name="Days7"  GroupName="Days" Style="{StaticResource Chip}" Content="7 jours" IsChecked="True"/>
+                    <RadioButton x:Name="Days30" GroupName="Days" Style="{StaticResource Chip}" Content="30 jours"/>
+                </StackPanel>
+                <WrapPanel x:Name="OptStorage" Visibility="Collapsed">
+                    <TextBlock Text="Dossier :" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <TextBox x:Name="TxtScanPath" Width="340" Height="30"/>
+                    <Button x:Name="BtnBrowse" Style="{StaticResource GhostButton}" Content="Parcourir…" Margin="6,0,18,0"/>
+                    <TextBlock Text="Gros fichiers à partir de :" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                    <RadioButton x:Name="Big100"  GroupName="Big" Style="{StaticResource Chip}" Content="100 Mo"/>
+                    <RadioButton x:Name="Big500"  GroupName="Big" Style="{StaticResource Chip}" Content="500 Mo" IsChecked="True"/>
+                    <RadioButton x:Name="Big2000" GroupName="Big" Style="{StaticResource Chip}" Content="2 Go"/>
+                </WrapPanel>
+            </StackPanel>
+
+            <!-- Progression -->
+            <StackPanel x:Name="ProgressRow" Grid.Row="2" Margin="0,14,0,0" Visibility="Collapsed">
+                <ProgressBar x:Name="Progress" Minimum="0" Maximum="100"/>
+                <TextBlock x:Name="TxtStatus" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,6,0,0"/>
+            </StackPanel>
+
+            <!-- Résultats -->
+            <ScrollViewer x:Name="Scroller" Grid.Row="3" Margin="0,16,0,0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel x:Name="ResultsPanel" Margin="0,0,8,0"/>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Window>
