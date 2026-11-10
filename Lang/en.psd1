@@ -1295,5 +1295,10 @@
     'Ui.ExportAiTip'       = 'Copy a summary of the problems for an AI assistant (Claude Code, Cursor…). PC name and user name are masked.'
     'Ui.AiCopied'          = 'AI diagnostic prompt copied to clipboard. Ready to paste into your assistant.'
     'Ui.AiFailed'          = 'Could not copy the diagnostic: {0}'
+    'Core.AnalysisError'   = 'Error during the analysis'
+    'Mnt.SrumStop'         = 'Stopping the Diagnostic Policy Service (DPS)…'
+    'Mnt.SrumDone'         = 'Counters reset. Previous database saved in: '
+    'Mnt.SrumFail'         = 'Failed: '
+    'Mnt.SrumSvc'          = 'DPS service: '
     # @@END@@
 }

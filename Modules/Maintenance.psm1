@@ -90,22 +90,25 @@ function Get-SrumResetCommand {
         Volontairement PAS de « netsh int ip reset » : cela réinitialise toute la pile réseau (DNS, IP fixes)
         sans remettre les compteurs à zéro.
     #>
-    @'
+    $cmd = @'
 $sru = Join-Path $env:windir 'System32\sru'
 $bak = Join-Path $env:windir ('System32\sru.sauvegarde-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 try {
-    Write-Host 'Arrêt du service Stratégie de diagnostic (DPS)…'
+    Write-Host '@@STOP@@'
     Stop-Service -Name DPS -Force -ErrorAction Stop
     New-Item -ItemType Directory -Path $bak -ErrorAction Stop | Out-Null
     Get-ChildItem -LiteralPath $sru -Force | Move-Item -Destination $bak -Force -ErrorAction Stop
-    Write-Host "Compteurs remis à zéro. Ancienne base sauvegardée dans : $bak" -ForegroundColor Green
+    Write-Host ('@@DONE@@' + $bak) -ForegroundColor Green
 } catch {
-    Write-Host "Échec : $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host ('@@FAIL@@' + $_.Exception.Message) -ForegroundColor Red
 } finally {
     Start-Service -Name DPS -ErrorAction SilentlyContinue
-    Write-Host ('Service DPS : ' + (Get-Service DPS).Status)
+    Write-Host ('@@SVC@@' + (Get-Service DPS).Status)
 }
 '@
+    # Les textes viennent du dictionnaire ; l'apostrophe est doublée car ils sont placés entre apostrophes
+    foreach ($k in 'Stop', 'Done', 'Fail', 'Svc') { $cmd = $cmd.Replace("@@$($k.ToUpper())@@", (Get-Text "Mnt.Srum$k").Replace("'", "''")) }
+    $cmd
 }
 
 #endregion

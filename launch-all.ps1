@@ -66,8 +66,8 @@ $Projects = [ordered]@{
         Discord = @('Discord officiel Tauri (#showcase) : https://discord.gg/tauri', 'DevFR (salon projets)', 'Serveurs Rust FR/EN')
     }
     '3' = @{
-        Name = 'PC-Toolkit (v1.7.0)'; Dir = $Here; Kit = 'LAUNCH_KIT.md'
-        Repo = 'https://github.com/TxF-AI/PC-Toolkit'; Release = 'https://github.com/TxF-AI/PC-Toolkit/releases/tag/v1.7.0'
+        Name = 'PC-Toolkit (v1.7.1)'; Dir = $Here; Kit = 'LAUNCH_KIT.md'
+        Repo = 'https://github.com/TxF-AI/PC-Toolkit'; Release = 'https://github.com/TxF-AI/PC-Toolkit/releases/tag/v1.7.1'
         Media = @('dist-launch\demo.gif', 'dist-launch\ui-dashboard.png', 'dist-launch\ui-presets.png')
         Subs = @('PowerShell', 'windows', 'programming', 'CoolGithubProjects')
         Discord = @('Serveurs PowerShell', 'DevFR (salon projets)', 'Communautes Windows / MAO (preset audio)')

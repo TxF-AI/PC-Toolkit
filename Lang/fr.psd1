@@ -1296,5 +1296,10 @@
     'Ui.ExportAiTip'       = 'Copier un résumé des problèmes pour un assistant IA (Claude Code, Cursor…). Nom du PC et nom d''utilisateur masqués.'
     'Ui.AiCopied'          = 'Diagnostic IA copié dans le presse-papiers. Prêt à coller dans votre assistant.'
     'Ui.AiFailed'          = 'Copie du diagnostic impossible : {0}'
+    'Core.AnalysisError'   = 'Erreur pendant l''analyse'
+    'Mnt.SrumStop'         = 'Arrêt du service Stratégie de diagnostic (DPS)…'
+    'Mnt.SrumDone'         = 'Compteurs remis à zéro. Ancienne base sauvegardée dans : '
+    'Mnt.SrumFail'         = 'Échec : '
+    'Mnt.SrumSvc'          = 'Service DPS : '
     # @@END@@
 }

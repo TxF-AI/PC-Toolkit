@@ -15,6 +15,15 @@ $script:LangFile = Join-Path $script:AppRoot 'Data\language.json'
 $script:Supported = @('fr', 'en')
 $script:Dict = @{}
 $script:Current = $null
+$script:BaseCulture = [System.Threading.Thread]::CurrentThread.CurrentCulture
+
+function Update-AppCulture {
+    <# Nombres et dates suivent la langue de l'interface : en anglais sur un Windows non anglais, culture en-US (13.0 et non 13,0). #>
+    try {
+        $c = if ($script:Current -eq 'en' -and $script:BaseCulture.TwoLetterISOLanguageName -ne 'en') { [cultureinfo]'en-US' } else { $script:BaseCulture }
+        [System.Threading.Thread]::CurrentThread.CurrentCulture = $c
+    } catch { }
+}
 
 function Get-SupportedLanguage { <# Codes de langue gérés. #> @($script:Supported) }
 
@@ -59,7 +68,7 @@ function Get-AppLanguage {
     if ($script:Current) { return $script:Current }
     $code = $null
     # Variable d'environnement PCTOOLKIT_LANG (tests, développement) : prioritaire, jamais écrite sur disque
-    if ($env:PCTOOLKIT_LANG -in $script:Supported) { $script:Current = $env:PCTOOLKIT_LANG; return $script:Current }
+    if ($env:PCTOOLKIT_LANG -in $script:Supported) { $script:Current = $env:PCTOOLKIT_LANG; Update-AppCulture; return $script:Current }
     try {
         if (Test-Path -LiteralPath $script:LangFile) {
             $code = (Get-Content -LiteralPath $script:LangFile -Raw -Encoding UTF8 | ConvertFrom-Json).Language
@@ -67,6 +76,7 @@ function Get-AppLanguage {
     } catch { $code = $null }
     if ($code -notin $script:Supported) { $code = Get-DefaultLanguage }
     $script:Current = $code
+    Update-AppCulture
     $code
 }
 
@@ -76,6 +86,7 @@ function Set-AppLanguage {
     $Code = $Code.ToLower()
     if ($Code -notin $script:Supported) { return $false }
     $script:Current = $Code
+    Update-AppCulture
     if (-not $NoSave) {
         try {
             $dir = Split-Path $script:LangFile -Parent

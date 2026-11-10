@@ -137,7 +137,7 @@ function Add-DiagSection {
     }
     try { & $Body $s }
     catch {
-        Add-DiagItem $s 'Erreur pendant l''analyse' $_.Exception.Message 'Crit'
+        Add-DiagItem $s (Get-Text 'Core.AnalysisError') $_.Exception.Message 'Crit'
         Write-AppLog ("[{0}] {1}" -f $Title, $_.Exception.Message) 'ERROR'
     }
     [void]$Result.Sections.Add($s)

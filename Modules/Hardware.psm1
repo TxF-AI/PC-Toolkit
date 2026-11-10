@@ -130,7 +130,13 @@ function Invoke-HardwareDiagnostic {
         $st = if ($ageY -ge 2) { 'Warn' } else { 'OK' }
         Add-DiagItem $s (Get-Text 'Hw.064') ((Get-Text 'Hw.065') -f $bios.SMBIOSBIOSVersion, $bd) $st $(if ($ageY -ge 2) { (Get-Text 'Hw.066' $ageY) } else { '' })
         try {
-            $plan = (powercfg /getactivescheme) -replace '^.*\((.*)\)\s*$', '$1'
+            $raw = [string](powercfg /getactivescheme)
+            $plan = $raw -replace '^.*\((.*)\)\s*$', '$1'
+            # Windows donne le nom dans sa propre langue : en anglais, on affiche le nom anglais des plans standard
+            if ((Get-AppLanguage) -eq 'en') {
+                $std = @{ '381b4222' = 'Balanced'; '8c5e7fda' = 'High performance'; 'a1841308' = 'Power saver'; 'e9a42b02' = 'Ultimate Performance' }
+                foreach ($g in $std.Keys) { if ($raw -match $g) { $plan = $std[$g] } }
+            }
             Add-DiagItem $s (Get-Text 'Hw.067') $plan 'Info'
         } catch { }
         $sb = try { Confirm-SecureBootUEFI -ErrorAction Stop } catch { $null }

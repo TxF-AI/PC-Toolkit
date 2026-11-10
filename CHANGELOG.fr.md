@@ -2,6 +2,14 @@
 
 🇬🇧 [English version](CHANGELOG.md)
 
+## 1.7.1 (2026-11-10)
+
+**Mode anglais : suppression du français restant**
+- **Nombres** selon la langue de l'interface : en anglais, `32.0 GB` et `44.1 kHz` au lieu de `32,0` et `44,1` sur un Windows français.
+- **Mode d'alimentation** : les quatre plans standard de Windows s'affichent avec leur nom anglais (par exemple `High performance`).
+- Le libellé d'**erreur de section** et la **console administrateur** de remise à zéro des compteurs de données sont maintenant traduits.
+- Les noms fournis par Windows lui-même (périphériques audio, messages du journal d'événements) restent dans la langue de Windows : rien n'est inventé.
+
 ## 1.7.0 (2026-11-10)
 
 **Diagnostic à copier pour un assistant IA**

@@ -2,6 +2,14 @@
 
 🇫🇷 [Version française](CHANGELOG.fr.md)
 
+## 1.7.1 (2026-11-10)
+
+**English mode: remaining French removed**
+- **Numbers** follow the interface language: in English, `32.0 GB` and `44.1 kHz` instead of `32,0` and `44,1` on a French Windows.
+- **Power mode**: the four standard Windows plans are shown with their English name (for example `High performance`).
+- **Section error** label and the **administrator console** that resets the data-usage counters are now translated.
+- Names that come from Windows itself (audio devices, event-log messages) stay in the language of Windows: nothing is invented.
+
 ## 1.7.0 (2026-11-10)
 
 **Copy AI diagnostic prompt**

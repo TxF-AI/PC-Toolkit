@@ -6,7 +6,7 @@ Lancement groupé des 3 projets (utilisé par l'option [4] de `launch-all.ps1`).
 |---|---|---|
 | DevEnv Doctor v0.2.0 (Rust + Tauri v2) | https://github.com/TxF-AI/devenv-doctor | `devenv-doctor/assets/demo.gif` |
 | PortDoctor v0.1.0 (Rust + Tauri v2) | https://github.com/TxF-AI/port-doctor | `port-doctor/assets/demo.gif` |
-| PC Toolkit v1.7.0 (PowerShell + WPF) | https://github.com/TxF-AI/PC-Toolkit | `PC Toolkit/dist-launch/demo.gif` |
+| PC Toolkit v1.7.1 (PowerShell + WPF) | https://github.com/TxF-AI/PC-Toolkit | `PC Toolkit/dist-launch/demo.gif` |
 
 > Réalité à ne pas déformer : ce sont **3 outils indépendants** (pas un installateur commun), publiés sous licence MIT. Les deux « Doctor » sont des exécutables portables de 4,5 et 4,3 Mo, non signés (SmartScreen) ; PC Toolkit est un zip de 130 Ko. Aucun chiffre de RAM n'est annoncé (non mesuré en release). Hacker News préfère **un projet par Show HN** : pour la suite, soumettre plutôt le projet principal et citer les deux autres dans le premier commentaire.
 
