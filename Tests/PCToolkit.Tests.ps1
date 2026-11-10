@@ -25,6 +25,10 @@ Describe 'I18n' {
         $extra = @($en.Keys | Where-Object { -not $fr.ContainsKey($_) })
         ($extra -join ', ') | Should Be ''
     }
+    It 'Get-Text remplace {0} même pour un argument $false ou 0' {
+        (Get-Text 'Ui.618' $false) | Should Be 'Démarrage (admin=False)'
+        (Get-Text 'Ui.618' 0) | Should Be 'Démarrage (admin=0)'
+    }
     It 'aucune traduction vide' {
         $empty = @(@($fr.Keys | Where-Object { -not $fr[$_] }) + @($en.Keys | Where-Object { -not $en[$_] }))
         ($empty -join ', ') | Should Be ''

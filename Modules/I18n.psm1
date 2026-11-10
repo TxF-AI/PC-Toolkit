@@ -96,7 +96,7 @@ function Get-Text {
         if ($null -eq $text) { $fr = Read-Dictionary 'fr'; if ($fr.ContainsKey($Key)) { $text = $fr[$Key] } }
         if ($null -eq $text) { return $Key }
         $text = $text.Replace('\n', "`n")   # \n = retour à la ligne dans les dictionnaires
-        if ($FormatArgs -and @($FormatArgs).Count -gt 0) {
+        if ($null -ne $FormatArgs -and @($FormatArgs).Count -gt 0) {   # pas `if ($FormatArgs)` : un seul argument $false / 0 serait ignoré
             try { return ($text -f @($FormatArgs)) } catch { return $text }
         }
         $text

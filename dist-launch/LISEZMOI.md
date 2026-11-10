@@ -15,3 +15,5 @@ Médias prêts à glisser-déposer dans les publications (voir `LAUNCH_KIT.md` e
 **Anonymisation :** le nom du PC, les modèles de processeur, de carte graphique et de périphérique audio ont été remplacés par des libellés génériques (`PC-DEMO`, « Processeur », « Carte graphique », « Périphérique audio »). Les mesures de charge (CPU, RAM, disque) et les horodatages sont réels. Si tu refais les visuels, relis chaque image avant de la publier.
 
 Ce dossier n'est pas inclus dans le zip distribué (`Build-Zip.ps1` n'embarque que les fichiers listés).
+
+**Langues :** les fichiers ci-dessus sont en **anglais** (interface lancée avec `PCTOOLKIT_LANG=en`) ; les versions françaises portent le suffixe `.fr` (`demo.fr.gif`, `ui-dashboard.fr.png`, etc.).
