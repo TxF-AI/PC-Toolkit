@@ -1292,5 +1292,8 @@
     'Uni.018'              = '  Press Enter to close'
     'Uni.019'              = '  Uninstall failed: {0}'
     'Uni.020'              = '  Press Enter to close'
+    'Ui.ExportAiTip'       = 'Copy a summary of the problems for an AI assistant (Claude Code, Cursor…). PC name and user name are masked.'
+    'Ui.AiCopied'          = 'AI diagnostic prompt copied to clipboard. Ready to paste into your assistant.'
+    'Ui.AiFailed'          = 'Could not copy the diagnostic: {0}'
     # @@END@@
 }

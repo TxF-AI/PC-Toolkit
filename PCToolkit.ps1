@@ -1284,6 +1284,17 @@ function Export-CurrentPage([string]$Format) {
     } catch { Show-Message (Get-Text 'Ui.579' $($_.Exception.Message)) (Get-Text 'Ui.580') 'Error' }
 }
 
+function Copy-AiPrompt {
+    <# Copie dans le presse-papiers un resume des problemes du diagnostic affiche, a coller dans un assistant IA. #>
+    try {
+        $res = Get-CurrentResult
+        if (-not $res) { Show-Message (Get-Text 'Ui.577'); return }
+        [System.Windows.Clipboard]::SetText((Format-DiagAiPrompt -Results @($res)))
+        $UI.TxtStatus.Text = Get-Text 'Ui.AiCopied'
+        Write-AppLog (Get-Text 'Ui.AiCopied')
+    } catch { Show-Message (Get-Text 'Ui.AiFailed' $($_.Exception.Message)) 'PC Toolkit' 'Error' }
+}
+
 function Remove-SelectedHistory {
     $paths = Get-SelectedHistoryPaths
     if (-not $paths) { Show-Message (Get-Text 'Ui.582'); return }
@@ -1441,6 +1452,7 @@ function Update-UiLanguage {
     $UI.TxtCancel.Text = Get-Text 'Ui.Cancel'
     $UI.BtnExport.ToolTip = Get-Text 'Ui.ExportHtmlTip'
     $UI.BtnExportTxt.ToolTip = Get-Text 'Ui.ExportTxtTip'
+    $UI.BtnExportAi.ToolTip = Get-Text 'Ui.ExportAiTip'
     $UI.ChkNotepad.Content = Get-Text 'Ui.OpenNotepad'
     $UI.LblGaugeCpu.Text = Get-Text 'Gauge.Cpu'
     $UI.LblGaugeRam.Text = Get-Text 'Gauge.Ram'
@@ -1468,6 +1480,7 @@ $UI.BtnCancel.Add_Click({ if ($script:Job) { $script:Job.Ctx.Cancel = $true; $UI
 $UI.BtnBack.Add_Click({ Set-Page 'History' })
 $UI.BtnExport.Add_Click({ Export-CurrentPage 'Html' })
 $UI.BtnExportTxt.Add_Click({ Export-CurrentPage 'Txt' })
+$UI.BtnExportAi.Add_Click({ Copy-AiPrompt })
 $UI.BtnBrowse.Add_Click({
     $dlg = New-Object System.Windows.Forms.FolderBrowserDialog
     $dlg.Description = Get-Text 'Opt.BrowseDesc'

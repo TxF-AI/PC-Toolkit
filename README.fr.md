@@ -3,8 +3,8 @@
 🇬🇧 [English version](https://github.com/TxF-AI/PC-Toolkit/blob/main/README.md)
 
 [![CI](https://github.com/TxF-AI/PC-Toolkit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/TxF-AI/PC-Toolkit/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-v1.6.0-FF2A4D)
-![Tests Pester](https://img.shields.io/badge/tests%20Pester-166%2F166%20passing-brightgreen)
+![Version](https://img.shields.io/badge/version-v1.7.0-FF2A4D)
+![Tests Pester](https://img.shields.io/badge/tests%20Pester-167%2F167%20passing-brightgreen)
 ![Licence](https://img.shields.io/badge/licence-MIT-22E5FF)
 ![Compatibilité](https://img.shields.io/badge/PowerShell-5.1%2B%20%7C%20Windows%2010%20%26%2011-blue)
 
@@ -50,7 +50,7 @@ PC Toolkit n'est pas signé numériquement (un certificat coûte plusieurs centa
   ```powershell
   Get-ChildItem -Path "C:\chemin\vers\PC Toolkit" -Recurse | Unblock-File
   # ou, pour le zip seul :
-  Unblock-File -Path .\PC-Toolkit-v1.6.0.zip
+  Unblock-File -Path .\PC-Toolkit-v1.7.0.zip
   ```
 - Si l'écran bleu « Windows a protégé votre ordinateur » apparaît : cliquez **Informations complémentaires** > **Exécuter quand même**.
 - Tout le code est lisible : ce sont des fichiers texte (`.ps1`, `.psm1`, `.xaml`) que vous pouvez ouvrir avec le Bloc-notes avant de lancer quoi que ce soit.
@@ -60,7 +60,7 @@ PC Toolkit est un ensemble de scripts PowerShell **non signés**. Windows appliq
 
 - **SmartScreen / « Mark of the Web »** : un fichier téléchargé reçoit une marque « venant d'Internet », d'où l'avertissement. Elle se retire avec `Unblock-File` :
   ```powershell
-  Unblock-File -Path .\PC-Toolkit-v1.6.0.zip
+  Unblock-File -Path .\PC-Toolkit-v1.7.0.zip
   ```
   À faire **avant** d'extraire le zip (ou sur le dossier extrait avec `Get-ChildItem -Recurse | Unblock-File`).
 - **Politique d'exécution PowerShell** : sur certains PC, les scripts sont bloqués (« l'exécution de scripts est désactivée sur ce système »). `Lancer PC Toolkit.cmd` contourne ce blocage pour sa propre session. Si vous lancez les scripts à la main depuis PowerShell, autorisez-les pour la **fenêtre en cours seulement** (rien n'est modifié durablement) :
@@ -161,7 +161,7 @@ Le code de sortie est le nombre de tests en échec (`0` = tout est bon). Le zip 
 PC Toolkit est développé en **binôme humain / IA** :
 
 - **Direction du projet (TxF-AI)** : cahier des charges de chaque version, choix d'architecture (interface WPF, un module PowerShell par page, jobs en arrière-plan), règles de sécurité non négociables (diagnostics en lecture seule, aperçu puis confirmation avant toute modification, sauvegarde et restauration, aucune mesure inventée, aucune dépendance), relecture et validation des résultats, tests sur de vrais PC, mise en place du CI/CD et de la publication.
-- **Assistant de développement (Claude Code, Anthropic)** : utilisé comme *Senior Pair Programmer* pour prototyper vite et écrire la majeure partie du code, de la suite de **166 tests Pester** et de la documentation, sous cette direction et ces garde-fous.
+- **Assistant de développement (Claude Code, Anthropic)** : utilisé comme *Senior Pair Programmer* pour prototyper vite et écrire la majeure partie du code, de la suite de **167 tests Pester** et de la documentation, sous cette direction et ces garde-fous.
 
 Cette façon de travailler est un choix assumé : chaque changement passe par la suite de tests (`Run-Tests.ps1`), par la CI GitHub Actions et, pour les actions système, par un essai réel en administrateur avant livraison.
 

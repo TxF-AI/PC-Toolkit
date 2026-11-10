@@ -2,6 +2,13 @@
 
 🇬🇧 [English version](CHANGELOG.md)
 
+## 1.7.0 (2026-11-10)
+
+**Diagnostic à copier pour un assistant IA**
+- Nouveau bouton **AI** à côté de HTML et TXT : il copie dans le presse-papiers un résumé Markdown du diagnostic affiché, en ne gardant que les éléments critiques et à surveiller (par section), suivi d'une question toute prête pour un assistant IA (Claude Code, Cursor…).
+- Le nom du PC et le nom d'utilisateur Windows sont masqués (`<pc>`, `<user>`). Rien n'est envoyé sur Internet : le texte va seulement dans le presse-papiers.
+- `Format-DiagAiPrompt` dans `Modules\Core.psm1` ; 167 tests Pester.
+
 ## 1.6.0 (2026-11-10)
 
 **Interface bilingue français / anglais**

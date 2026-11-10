@@ -1,9 +1,9 @@
-# LAUNCH_KIT — PC Toolkit v1.6.0
+# LAUNCH_KIT — PC Toolkit v1.7.0
 
 Textes prêts à publier (le script `launch-all.ps1` les copie dans le presse-papier et ouvre les pages). Avant de poster : relire, adapter le ton, joindre **`dist-launch/demo.gif`** (9 s, 1 Mo : média principal) ou, à défaut, une capture (`dist-launch/ui-dashboard.png`, `dist-launch/ui-presets.png`) et **respecter les règles d'auto-promotion de chaque communauté** (flair « Show & Tell » / « Project », pas de multi-posts le même jour, répondre aux commentaires).
 
 - Repo : https://github.com/TxF-AI/PC-Toolkit
-- Release : https://github.com/TxF-AI/PC-Toolkit/releases/tag/v1.6.0 (`PC-Toolkit-v1.6.0.zip`, 130 Ko)
+- Release : https://github.com/TxF-AI/PC-Toolkit/releases/tag/v1.7.0 (`PC-Toolkit-v1.7.0.zip`, 130 Ko)
 - SHA-256 : `B17A4528575AAEA3EEF527F58BF1B5BA6E629F819B7C8E1C7BDDAB48FB6138B9`
 
 > Rappels : PC Toolkit est en **PowerShell 5.1 + WPF** (pas Rust, pas Tauri) : ne pas poster sur r/rust. Ce n'est **pas un antivirus** (Security Guard est un audit léger) : ne jamais le présenter comme tel. Le zip n'est pas signé (SmartScreen). Les visuels de `dist-launch/` sont anonymisés (nom du PC et matériel remplacés) ; les mesures de charge sont réelles. Aucun chiffre de performance n'est annoncé : les gains se mesurent dans le Bilan avant/après de chacun.
@@ -41,7 +41,7 @@ I wanted one place to see what is going on with my Windows PC (hardware, network
 **Quality**: 165 Pester tests, MIT licensed. The release zip is not code-signed, so SmartScreen will warn; compare the hash.
 
 **Download / verify**
-https://github.com/TxF-AI/PC-Toolkit/releases/tag/v1.6.0
+https://github.com/TxF-AI/PC-Toolkit/releases/tag/v1.7.0
 `SHA-256: B17A4528575AAEA3EEF527F58BF1B5BA6E629F819B7C8E1C7BDDAB48FB6138B9`
 
 It was built with an AI pair programmer under strict rules (documented in the README). I'd love **feedback**: pages or indicators you'd want, presets that should (not) stop a given service, bugs on your setup. Issues and PRs welcome.
@@ -107,7 +107,7 @@ Rules I set: diagnostics are read-only, every change = preview + confirmation + 
 
 Mon PC ralentissait, je ne savais pas pourquoi, et je ne voulais pas d'un « optimiseur » qui modifie tout en silence ni d'un logiciel à installer.
 
-PC//TOOLKIT (v1.6.0), en PowerShell 5.1 + WPF :
+PC//TOOLKIT (v1.7.0), en PowerShell 5.1 + WPF :
 🔍 diagnostics en lecture seule : matériel, réseau, Windows, stockage, audio, démarrage
 🎮 presets 1-clic Jeu / MAO / Bureautique, avec aperçu, confirmation et restauration en un clic
 🛡️ Security Guard : audit léger et quarantaine restaurable (ce n'est pas un antivirus)

@@ -439,6 +439,57 @@ function Export-DiagText {
     $Path
 }
 
+function Format-DiagAiPrompt {
+    <#
+        Resume Markdown des problemes trouves (statuts Crit et Warn), a coller dans un assistant IA.
+        Toujours en anglais (les libelles des mesures restent ceux du diagnostic). Le nom du PC et le nom
+        d'utilisateur sont masques. Rien n'est envoye : l'appelant place le texte dans le presse-papiers.
+    #>
+    param([object[]]$Results, [int]$MaxPerModule = 60)
+    $mask = {
+        param($t)
+        $t = [string]$t
+        foreach ($p in @(@($env:COMPUTERNAME, '<pc>'), @($env:USERNAME, '<user>'))) {
+            if ($p[0] -and $p[0].Length -ge 3) { $t = [regex]::Replace($t, [regex]::Escape($p[0]), $p[1], 'IgnoreCase') }
+        }
+        ($t -replace '\s+', ' ').Trim()
+    }
+    $main = @($Results | Where-Object { $_ -and $_.Module -ne 'Bilan' })
+    $out = New-Object System.Collections.Generic.List[string]
+    $out.Add('### PC Toolkit Diagnostic Summary')
+    $out.Add('')
+    $out.Add('**Context:**')
+    $out.Add(('- **Application:** PC Toolkit v{0}' -f (Get-AppVersion)))
+    $out.Add(('- **OS:** {0}' -f [Environment]::OSVersion.VersionString))
+    $out.Add(('- **Timestamp:** {0:yyyy-MM-dd HH:mm:ss}' -f (Get-Date)))
+    $out.Add(('- **Elevated Privileges (Admin):** {0}' -f $(if (Test-IsAdmin) { 'Yes' } else { 'No' })))
+    foreach ($r in $main) {
+        $st = Get-DiagStats $r
+        $out.Add('')
+        $out.Add(('#### {0} ({1} critical, {2} warning, {3} OK)' -f (& $mask $r.Title), $st.Crit, $st.Warn, $st.OK))
+        $out.Add(('- **Run:** {0}{1}' -f $r.Date, $(if ($r.Cancelled) { ' (interrupted, partial result)' } else { '' })))
+        $n = 0
+        foreach ($s in @($r.Sections)) {
+            foreach ($i in @($s.Items | Where-Object { $_.Status -in 'Crit', 'Warn' })) {
+                $n++
+                if ($n -gt $MaxPerModule) { continue }
+                $tag = if ($i.Status -eq 'Crit') { 'CRITICAL' } else { 'WARNING' }
+                $detail = if ($i.Detail) { ' ({0})' -f (& $mask $i.Detail) } else { '' }
+                $out.Add(('- [{0}] {1} / {2}: {3}{4}' -f $tag, (& $mask $s.Title), (& $mask $i.Label), (& $mask $i.Value), $detail))
+            }
+        }
+        if ($n -eq 0) { $out.Add('- No critical or warning item.') }
+        elseif ($n -gt $MaxPerModule) { $out.Add(('- ... and {0} more' -f ($n - $MaxPerModule))) }
+    }
+    $out.Add('')
+    $out.Add('#### Task for AI Assistant')
+    $out.Add('Analyze the diagnostic data above (labels may be in French) and provide:')
+    $out.Add('1. The items to fix first, ordered by risk, and why.')
+    $out.Add('2. For each one, the safest way to fix it on Windows 10/11, with the exact steps or commands.')
+    $out.Add('3. Which warnings are harmless and can be ignored.')
+    $out -join "`r`n"
+}
+
 #endregion
 
 Export-ModuleMember -Function *

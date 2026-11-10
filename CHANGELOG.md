@@ -2,6 +2,13 @@
 
 🇫🇷 [Version française](CHANGELOG.fr.md)
 
+## 1.7.0 (2026-11-10)
+
+**Copy AI diagnostic prompt**
+- New **AI** button next to HTML and TXT: it copies to the clipboard a Markdown summary of the diagnostic on screen, keeping only the critical and warning items (by section), followed by a ready-made question for an AI assistant (Claude Code, Cursor…).
+- The PC name and the Windows user name are masked (`<pc>`, `<user>`). Nothing is sent over the Internet: the text only goes to your clipboard.
+- `Format-DiagAiPrompt` in `Modules\Core.psm1`; 167 Pester tests.
+
 ## 1.6.0 (2026-11-10)
 
 **Bilingual interface, French / English** (2026-11-09)

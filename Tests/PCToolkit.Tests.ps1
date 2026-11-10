@@ -159,6 +159,24 @@ Describe 'Core' {
     It 'ConvertTo-HtmlSafe échappe le HTML' {
         ConvertTo-HtmlSafe '<script>&' | Should Be '&lt;script&gt;&amp;'
     }
+    It 'Format-DiagAiPrompt ne garde que les problèmes et masque le nom du PC et de l''utilisateur' {
+        $r = New-DiagResult 'Hardware' 'Materiel'
+        Add-DiagSection $r 'Disques' -Body {
+            param($s)
+            Add-DiagItem $s 'Sante' 'Mauvaise' 'Crit' ('dossier C:\Users\{0}\x sur {1}' -f $env:USERNAME, $env:COMPUTERNAME)
+            Add-DiagItem $s 'Espace' '5 %' 'Warn'
+            Add-DiagItem $s 'Type' 'SSD' 'OK'
+        }
+        $p = Format-DiagAiPrompt -Results @($r)
+        $p | Should Match '\[CRITICAL\] Disques / Sante: Mauvaise'
+        $p | Should Match '\[WARNING\] Disques / Espace: 5 %'
+        $p | Should Not Match 'Type: SSD'
+        $p | Should Match '1 critical, 1 warning, 1 OK'
+        $p | Should Match 'Task for AI Assistant'
+        if ($env:USERNAME.Length -ge 3) { $p | Should Match 'C:\\Users\\<user>\\x sur <pc>' }
+        $vide = New-DiagResult 'Network' 'Reseau'
+        (Format-DiagAiPrompt -Results @($vide)) | Should Match 'No critical or warning item'
+    }
 }
 
 Describe 'Windows : fin de support (liste unique)' {
