@@ -37,6 +37,7 @@ jobs:
           $sha = "$zip.sha256.txt"
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
           $notes = "SHA-256 de ``$(Split-Path $zip -Leaf)`` : ``$hash```n`nSi SmartScreen s'affiche : ``Unblock-File -Path .\$(Split-Path $zip -Leaf)`` (voir le README). Détail des changements : CHANGELOG.md."
+          $ErrorActionPreference = 'Continue'   # gh renvoie une erreur si la release n'existe pas encore
           gh release view $tag *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag $zip $sha --clobber
