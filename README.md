@@ -20,6 +20,12 @@ Dark interface with neon red and cyan accents. **The interface is available in E
 - **Before/after report on 11 indicators**: freed space, RAM, services, processes, startup programs, temp files, ghost audio devices, active suspicious items, quarantined threats, optimization profile… exportable as HTML and TXT.
 - **Safe by design**: read-only diagnostics, preview then confirmation before any change, no invented measurement ("Non disponible" = "Not available"), no dependency.
 
+## 🎯 Who is it for?
+
+* **Power users and gamers:** a read-only health check of your Windows PC (hardware, network, storage, audio), one-click Game / Music production / Office presets with preview and restore, and a before/after report that shows what really changed.
+* **Developers and people coding with AI tools:** keep the workstation clean and free of background bloat that slows down builds and editors, and check startup programs and security basics in one place.
+* **People who value privacy and transparency:** a plain PowerShell + WPF app with no external dependency, nothing to install, nothing sent over the Internet, and every system change previewed, confirmed and logged.
+
 ## Quick start
 
 1. **Extract the zip**: right-click `PC-Toolkit-v<version>.zip` > **Extract All…**
