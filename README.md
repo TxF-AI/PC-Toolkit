@@ -11,6 +11,8 @@
 A diagnostics and optimization toolbox for Windows 10/11: hardware, network, Windows, storage, audio, maintenance and security.
 Dark interface with neon red and cyan accents. **The interface is available in English and French** (FR / EN switch in the sidebar, applied live; the default follows your Windows language). **Nothing to install**: Windows is enough. Nothing is sent over the Internet.
 
+![PC Toolkit demo](dist-launch/demo.gif)
+
 ## Highlights
 
 - **Cyberpunk interface**: live CPU / RAM / C: disk gauges, neon glow, animated transitions and progress bars, built-in log console at the bottom of the window.

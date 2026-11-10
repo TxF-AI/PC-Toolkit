@@ -11,6 +11,8 @@
 Boîte à outils de diagnostic et d'optimisation pour Windows 10/11 : matériel, réseau, Windows, stockage, audio, maintenance et sécurité.
 Interface sombre au rouge néon et cyan, **en français ou en anglais** (sélecteur FR / EN dans la barre latérale, appliqué à chaud ; par défaut la langue de Windows). **Aucun logiciel à installer** : Windows suffit. Rien n'est envoyé sur Internet.
 
+![Démo de PC Toolkit](dist-launch/demo.fr.gif)
+
 ## Points forts
 
 - **Interface cyberpunk** : jauges CPU / RAM / disque C: en direct, lueurs néon, transitions et barres de progression animées, console de logs intégrée en bas de la fenêtre.
