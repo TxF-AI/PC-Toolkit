@@ -3,7 +3,7 @@
 Textes prêts à publier (le script `launch-all.ps1` les copie dans le presse-papier et ouvre les pages). Avant de poster : relire, adapter le ton, joindre **`dist-launch/demo.gif`** (9 s, 1 Mo : média principal) ou, à défaut, une capture (`dist-launch/ui-dashboard.png`, `dist-launch/ui-presets.png`) et **respecter les règles d'auto-promotion de chaque communauté** (flair « Show & Tell » / « Project », pas de multi-posts le même jour, répondre aux commentaires).
 
 - Repo : https://github.com/TxF-AI/PC-Toolkit
-- Release : https://github.com/TxF-AI/PC-Toolkit/releases/tag/v1.7.0 (`PC-Toolkit-v1.7.0.zip`, 130 Ko)
+- Release : https://github.com/TxF-AI/PC-Toolkit/releases/tag/v1.7.0 (`PC-Toolkit-v1.7.0.zip`, 170 Ko)
 - SHA-256 : `B17A4528575AAEA3EEF527F58BF1B5BA6E629F819B7C8E1C7BDDAB48FB6138B9`
 
 > Rappels : PC Toolkit est en **PowerShell 5.1 + WPF** (pas Rust, pas Tauri) : ne pas poster sur r/rust. Ce n'est **pas un antivirus** (Security Guard est un audit léger) : ne jamais le présenter comme tel. Le zip n'est pas signé (SmartScreen). Les visuels de `dist-launch/` sont anonymisés (nom du PC et matériel remplacés) ; les mesures de charge sont réelles. Aucun chiffre de performance n'est annoncé : les gains se mesurent dans le Bilan avant/après de chacun.
