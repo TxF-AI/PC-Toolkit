@@ -22,9 +22,9 @@ Interface sombre au rouge néon et cyan, **en français ou en anglais** (sélect
 
 ## 🎯 Pour qui ?
 
-* **Les utilisateurs avancés et les joueurs :** un bilan de santé en lecture seule de votre PC Windows (matériel, réseau, stockage, audio), des presets 1-clic Jeu / MAO / Bureautique avec aperçu et restauration, et un bilan avant/après qui montre ce qui a vraiment changé.
-* **Les développeurs et les personnes qui codent avec des outils d'IA :** gardez le poste propre et sans processus de fond qui ralentissent les builds et les éditeurs, et contrôlez le démarrage et les bases de la sécurité au même endroit.
-* **Ceux qui tiennent à la confidentialité et à la transparence :** une appli PowerShell + WPF sans dépendance externe, rien à installer, rien envoyé sur Internet, et chaque changement système est prévisualisé, confirmé et journalisé.
+* **Utilisateurs avancés & Administrateurs Système :** Effectuez la maintenance approfondie de Windows, le diagnostic réseau et le nettoyage système via un moteur PowerShell natif sans dépendance externe.
+* **Développeurs & Codeurs assistés par IA :** Conservez une machine rapide et débarrassée du superflu système qui ralentit vos compilations et vos environnements de dev locaux.
+* **Adeptes du Minimalisme & de la Transparence :** Un kit d'outils propre sans dépendances tierces, développé en PowerShell et WPF natifs, disponible en version portable ou avec un installateur optionnel.
 
 ## Démarrage rapide
 

@@ -22,9 +22,9 @@ Dark interface with neon red and cyan accents. **The interface is available in E
 
 ## 🎯 Who is it for?
 
-* **Power users and gamers:** a read-only health check of your Windows PC (hardware, network, storage, audio), one-click Game / Music production / Office presets with preview and restore, and a before/after report that shows what really changed.
-* **Developers and people coding with AI tools:** keep the workstation clean and free of background bloat that slows down builds and editors, and check startup programs and security basics in one place.
-* **People who value privacy and transparency:** a plain PowerShell + WPF app with no external dependency, nothing to install, nothing sent over the Internet, and every system change previewed, confirmed and logged.
+* **Power Users & SysAdmins:** Perform deep Windows maintenance, network diagnostics, and system cleanup using a native, zero-dependency PowerShell engine.
+* **Developers & AI-Assisted Coders:** Keep your workstation fast, clean, and free from background system bloat that slows down builds and local dev environments.
+* **Minimalist & Transparency Advocates:** A clean, dependency-free toolkit built entirely on native PowerShell and WPF, available as a portable app or with an optional installer.
 
 ## Quick start
 
