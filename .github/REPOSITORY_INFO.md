@@ -4,7 +4,7 @@
 
 ## Description suggérée (≤ 350 caractères)
 ```
-Boîte à outils Windows 10/11 en PowerShell + WPF : diagnostic, presets d'optimisation Jeu/MAO/Bureautique, audit de sécurité léger avec quarantaine, bilan avant/après. Interface cyberpunk en français, diagnostics en lecture seule, aucune dépendance, rien envoyé sur Internet.
+Windows 10/11 toolbox in PowerShell + WPF: diagnostics, Game/Music/Office optimization presets, light security audit with quarantine, before/after report. Cyberpunk UI (FR/EN), read-only diagnostics, no dependencies, nothing sent over the Internet.
 ```
 
 ## Topics recommandés
