@@ -3,8 +3,8 @@
 🇫🇷 [Version française](https://github.com/TxF-AI/PC-Toolkit/blob/main/README.fr.md)
 
 [![CI](https://github.com/TxF-AI/PC-Toolkit/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/TxF-AI/PC-Toolkit/actions/workflows/ci.yml)
-![Version](https://img.shields.io/badge/version-v1.5.0-FF2A4D)
-![Pester tests](https://img.shields.io/badge/Pester%20tests-165%2F165%20passing-brightgreen)
+![Version](https://img.shields.io/badge/version-v1.6.0-FF2A4D)
+![Pester tests](https://img.shields.io/badge/Pester%20tests-166%2F166%20passing-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-22E5FF)
 ![Compatibility](https://img.shields.io/badge/PowerShell-5.1%2B%20%7C%20Windows%2010%20%26%2011-blue)
 
@@ -42,7 +42,7 @@ PC Toolkit is not digitally signed (a certificate costs several hundred euros pe
   ```powershell
   Get-ChildItem -Path "C:\path\to\PC Toolkit" -Recurse | Unblock-File
   # or, for the zip only:
-  Unblock-File -Path .\PC-Toolkit-v1.5.0.zip
+  Unblock-File -Path .\PC-Toolkit-v1.6.0.zip
   ```
 - If the blue "Windows protected your PC" screen appears: click **More info** > **Run anyway**.
 - All the code is readable: they are text files (`.ps1`, `.psm1`, `.xaml`) that you can open in Notepad before running anything.
@@ -52,7 +52,7 @@ PC Toolkit is a set of **unsigned** PowerShell scripts. Windows applies two sepa
 
 - **SmartScreen / "Mark of the Web"**: a downloaded file gets an "from the Internet" mark, hence the warning. It is removed with `Unblock-File`:
   ```powershell
-  Unblock-File -Path .\PC-Toolkit-v1.5.0.zip
+  Unblock-File -Path .\PC-Toolkit-v1.6.0.zip
   ```
   Do this **before** extracting the zip (or on the extracted folder with `Get-ChildItem -Recurse | Unblock-File`).
 - **PowerShell execution policy**: on some PCs, scripts are blocked ("running scripts is disabled on this system"). `Lancer PC Toolkit.cmd` bypasses this for its own session. If you run the scripts by hand from PowerShell, allow them for the **current window only** (nothing is changed permanently):
@@ -155,7 +155,7 @@ The exit code is the number of failing tests (`0` = all good). The distribution 
 PC Toolkit is developed as a **human / AI pair**:
 
 - **Project direction (TxF-AI)**: the specification of each version, architecture choices (WPF interface, one PowerShell module per page, background jobs), non-negotiable safety rules (read-only diagnostics, preview then confirmation before any change, backup and restore, no invented measurement, no dependency), review and validation of the results, tests on real PCs, CI/CD and release setup.
-- **Development assistant (Claude Code, Anthropic)**: used as a *Senior Pair Programmer* to prototype fast and write most of the code, the **165 Pester tests** and the documentation, under that direction and those guardrails.
+- **Development assistant (Claude Code, Anthropic)**: used as a *Senior Pair Programmer* to prototype fast and write most of the code, the **166 Pester tests** and the documentation, under that direction and those guardrails.
 
 This way of working is a deliberate choice: every change goes through the test suite (`Run-Tests.ps1`), through the GitHub Actions CI and, for system actions, through a real test as administrator before delivery.
 

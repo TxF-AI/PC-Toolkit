@@ -12,7 +12,7 @@ body:
     attributes:
       label: PC Toolkit version
       description: Shown at the bottom of the sidebar and in every report (`VERSION` file).
-      placeholder: "1.5.0"
+      placeholder: "1.6.0"
     validations:
       required: true
   - type: input

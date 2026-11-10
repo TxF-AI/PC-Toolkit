@@ -1,13 +1,18 @@
 # Nouveautés
 
-## Non publié
+## 1.6.0 (2026-11-10)
 
 **Interface bilingue français / anglais**
 - Sélecteur **FR / EN** en bas de la barre latérale, appliqué à chaud (sans relancer). Choix mémorisé dans `Data\language.json` (jamais versionné) ; par défaut, la langue de Windows.
 - Tout est traduit : menus, pages, diagnostics, constats et recommandations, presets, Security Guard, bilan, console, exports HTML / TXT, installateur et désinstallateur.
 - `Modules\I18n.psm1` (`Get-Text`, `Set-AppLanguage`) et dictionnaires `Lang\fr.psd1` / `Lang\en.psd1`. Une clé absente ne plante jamais : repli sur le français, puis sur la clé.
 - Limites : les résultats déjà enregistrés dans l'historique gardent la langue dans laquelle ils ont été produits ; les messages du journal d'événements Windows, les noms de périphériques et de plans d'alimentation restent dans la langue de Windows ; la console administrateur « Réinitialiser les compteurs de données (SRUM) » reste en français.
-- Tests : 165 (dont la parité FR/EN des dictionnaires, les marqueurs `{0}`, l'absence de français dans l'anglais, les exports en anglais).
+- Tests : 166 (dont la parité FR/EN des dictionnaires, les marqueurs `{0}`, l'absence de français dans l'anglais, les exports en anglais).
+
+**Documentation et correctif** (2026-11-10)
+- README, CONTRIBUTING et modèles d'issues en anglais par défaut ; versions françaises dans `README.fr.md` et `CONTRIBUTING.fr.md`.
+- GIF de démonstration et captures en anglais (`dist-launch/`), versions françaises en `*.fr.*`.
+- Correctif : `Get-Text` ignorait un unique argument `$false` ou `0` (la console affichait « admin={0} »). Test ajouté.
 
 ## 1.5.0
 
