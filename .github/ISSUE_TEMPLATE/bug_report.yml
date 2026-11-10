@@ -1,89 +1,89 @@
-name: Signaler un bug
-description: Quelque chose ne fonctionne pas comme prévu dans PC Toolkit.
+name: Bug report / Signaler un bug
+description: Something does not work as expected in PC Toolkit (English or French).
 title: "[Bug] "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        Merci de signaler le problème. **Les exports HTML/TXT et la console contiennent le nom de ton PC, ton matériel et parfois des chemins personnels : relis-les et masque ces informations avant de les joindre.**
+        Thanks for reporting the problem. **HTML/TXT exports and the console contain your PC name, your hardware and sometimes personal paths: review them and redact this information before attaching them.**
   - type: input
     id: app-version
     attributes:
-      label: Version de PC Toolkit
-      description: Affichée en bas de la barre latérale et dans chaque rapport (fichier `VERSION`).
+      label: PC Toolkit version
+      description: Shown at the bottom of the sidebar and in every report (`VERSION` file).
       placeholder: "1.5.0"
     validations:
       required: true
   - type: input
     id: os-version
     attributes:
-      label: Version de Windows
-      description: "Commande `winver`."
+      label: Windows version
+      description: "Run `winver`."
       placeholder: "Windows 11 23H2 (build 22631)"
     validations:
       required: true
   - type: input
     id: ps-version
     attributes:
-      label: Version de PowerShell
-      description: "Commande `$PSVersionTable.PSVersion` (Windows PowerShell 5.1 attendu)."
+      label: PowerShell version
+      description: "Run `$PSVersionTable.PSVersion` (Windows PowerShell 5.1 expected)."
       placeholder: "5.1.22621.4391"
   - type: dropdown
     id: privileges
     attributes:
-      label: Mode d'exécution
+      label: Run mode
       options:
-        - Mode standard
-        - Administrateur
-        - Je ne sais pas
+        - Standard mode
+        - Administrator
+        - I don't know
     validations:
       required: true
   - type: dropdown
     id: area
     attributes:
-      label: Page concernée
+      label: Page concerned
       options:
-        - Tableau de bord
-        - Matériel
-        - Réseau
+        - Dashboard
+        - Hardware
+        - Network
         - Windows
-        - Stockage
+        - Storage
         - Audio
         - Maintenance
-        - Démarrage
-        - Mode Performance (presets Jeu / MAO / Bureautique)
+        - Startup
+        - Performance Mode (Game / Music production / Office presets)
         - Security Guard
-        - Bilan avant/après
-        - Historique
-        - Installation / lancement
-        - Autre
+        - Before/after report
+        - History
+        - Installation / launch
+        - Other
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: Comportement attendu
+      label: Expected behavior
     validations:
       required: true
   - type: textarea
     id: actual
     attributes:
-      label: Comportement observé
+      label: Actual behavior
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
-      label: Étapes pour reproduire
+      label: Steps to reproduce
       placeholder: |
-        1. Ouvrir « Mode Performance »
-        2. Cliquer sur « Preset Jeu… »
+        1. Open "Performance Mode"
+        2. Click "Game preset…"
         3. ...
     validations:
       required: true
   - type: textarea
     id: logs
     attributes:
-      label: Console, message d'erreur, captures d'écran
-      description: Colle les lignes de la console intégrée ou glisse une capture (sans nom de PC ni données personnelles).
+      label: Console, error message, screenshots
+      description: Paste the lines from the built-in console or drop a screenshot (without PC name or personal data).

@@ -1,46 +1,46 @@
-name: Proposer une fonctionnalité
-description: Une idée pour améliorer PC Toolkit.
-title: "[Idée] "
+name: Feature request / Proposer une fonctionnalité
+description: An idea to improve PC Toolkit (English or French).
+title: "[Idea] "
 labels: ["enhancement"]
 body:
   - type: textarea
     id: need
     attributes:
-      label: Besoin
-      description: Quel problème veux-tu résoudre ? Qui est concerné (joueur, musicien, bureautique…) ?
+      label: Need
+      description: What problem do you want to solve? Who is affected (gamer, musician, office use…)?
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: Proposition
-      description: Décris ce que l'outil devrait faire (page, bouton, comportement).
+      label: Proposal
+      description: Describe what the tool should do (page, button, behavior).
     validations:
       required: true
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternatives envisagées
-      description: Contournements actuels, autres outils.
+      label: Alternatives considered
+      description: Current workarounds, other tools.
   - type: dropdown
     id: area
     attributes:
-      label: Concerne
+      label: Area
       options:
-        - Diagnostics (lecture seule)
-        - Maintenance / nettoyage
-        - Mode Performance / presets
+        - Diagnostics (read-only)
+        - Maintenance / cleanup
+        - Performance Mode / presets
         - Security Guard
-        - Bilan avant/après
+        - Before/after report
         - Interface
         - Installation
-        - Autre
+        - Other
   - type: checkboxes
     id: rules
     attributes:
-      label: Respect des règles du produit
+      label: Product rules
       options:
-        - label: Les diagnostics restent en lecture seule.
-        - label: Toute action qui modifie le système a un aperçu et une confirmation.
-        - label: Aucune dépendance externe ni envoi de données sur Internet.
-        - label: Les mesures que Windows n'expose pas s'affichent « Non disponible ».
+        - label: Diagnostics stay read-only.
+        - label: Any action that changes the system has a preview and a confirmation.
+        - label: No external dependency and no data sent over the Internet.
+        - label: Measurements that Windows does not expose are shown as "Not available".

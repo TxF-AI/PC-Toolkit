@@ -159,7 +159,7 @@ Cette façon de travailler est un choix assumé : chaque changement passe par la
 
 ## Contribuer
 
-Les contributions sont bienvenues : lisez [CONTRIBUTING.md](CONTRIBUTING.md) (règles du produit, pièges PowerShell 5.1, tests) puis ouvrez une issue avec les modèles *Signaler un bug* ou *Proposer une fonctionnalité*.
+Les contributions sont bienvenues : lisez [CONTRIBUTING.fr.md](CONTRIBUTING.fr.md) (règles du produit, pièges PowerShell 5.1, tests) puis ouvrez une issue avec les modèles *Signaler un bug* ou *Proposer une fonctionnalité*.
 
 ## Licence
 

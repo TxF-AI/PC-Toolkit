@@ -1,60 +1,63 @@
-# Contribuer à PC Toolkit
+# Contributing to PC Toolkit
 
-Merci de l'intérêt porté au projet ! Quelques règles simples pour que chaque contribution reste sûre et facile à relire.
+🇫🇷 [Version française](CONTRIBUTING.fr.md)
 
-## Avant de commencer
-- Ouvrez d'abord une **issue** (bug ou idée) pour en discuter, surtout pour une nouvelle fonctionnalité.
-- Environnement : **Windows 10/11**, **Windows PowerShell 5.1** (pas PowerShell 7), Pester 3.4 (fourni avec Windows).
+Thanks for your interest! A few simple rules keep every contribution safe and easy to review.
 
-## Structure du projet
+## Before you start
+- Open an **issue** first (bug or idea) to discuss it, especially for a new feature.
+- Environment: **Windows 10/11**, **Windows PowerShell 5.1** (not PowerShell 7), Pester 3.4 (shipped with Windows).
+
+## Project structure
 ```
-PCToolkit.ps1        interface WPF : pages, jobs en arrière-plan (runspace), jauges, console
-UI\MainWindow.xaml   design de l'interface
-Modules\Core.psm1    modèle de résultat (New-DiagResult / Add-DiagSection / Add-DiagItem), journal, exports HTML/TXT
-Modules\*.psm1       un module par page : Dashboard, Hardware, Network, WindowsAnalysis, Storage, Audio,
-                     Maintenance, Performance (démarrage, Mode Performance), Tuning (presets),
-                     SecurityGuard (audit, scan, quarantaine), Bilan (avant/après)
-Tests\               suite Pester (PCToolkit.Tests.ps1)
-Run-Tests.ps1        lance la suite ; Build-Zip.ps1 fabrique le zip de distribution
-Installer.ps1 / Desinstaller.ps1   installation et désinstallation utilisateur
-VERSION              seule source du numéro de version
+PCToolkit.ps1        WPF interface: pages, background jobs (runspace), gauges, console
+UI\MainWindow.xaml   interface design
+Modules\Core.psm1    result model (New-DiagResult / Add-DiagSection / Add-DiagItem), log, HTML/TXT exports
+Modules\*.psm1       one module per page: Dashboard, Hardware, Network, WindowsAnalysis, Storage, Audio,
+                     Maintenance, Performance (startup, Performance Mode), Tuning (presets),
+                     SecurityGuard (audit, scan, quarantine), Bilan (before/after)
+Modules\I18n.psm1    FR/EN texts (Get-Text); dictionaries in Lang\fr.psd1 and Lang\en.psd1
+Tests\               Pester suite (PCToolkit.Tests.ps1)
+Run-Tests.ps1        runs the suite; Build-Zip.ps1 builds the distribution zip
+Installer.ps1 / Desinstaller.ps1   per-user install and uninstall
+VERSION              the only source of the version number
 ```
 
-## Règles du produit (non négociables)
-- **Diagnostics en lecture seule.** Toute action qui modifie le système doit : afficher un aperçu, exiger une confirmation explicite (`-Confirmed`), puis écrire dans le journal (`Write-AppLog ... 'ACTION'`).
-- **Ne jamais inventer une mesure** : ce que Windows n'expose pas s'affiche « Non disponible ».
-- **Aucune dépendance externe**, rien à installer, rien envoyé sur Internet (hors pings/DNS du test réseau).
-- **Ne jamais modifier ni contourner les réglages de sécurité de Windows** (UAC, Defender, pare-feu).
-- L'interface ne doit jamais planter sur une erreur de module : gérer les erreurs.
-- Interface et messages **en français**.
+## Product rules (non-negotiable)
+- **Diagnostics are read-only.** Any action that changes the system must show a preview, require explicit confirmation (`-Confirmed`), then write to the log (`Write-AppLog ... 'ACTION'`).
+- **Never invent a measurement**: what Windows does not expose is shown as "Not available".
+- **No external dependency**, nothing to install, nothing sent over the Internet (except the network test's pings/DNS).
+- **Never change or bypass Windows security settings** (UAC, Defender, firewall).
+- The interface must never crash on a module error: handle errors.
+- Interface and messages are **in French and English** (FR/EN selector). Every visible text goes through `Get-Text`; a new key is added to **both** `Lang\fr.psd1` and `Lang\en.psd1` (the tests require the same keys and the same `{0}`, `{1}` placeholders).
 
-## Pièges PowerShell 5.1
-- Les fichiers `.ps1` / `.psm1` doivent être en **UTF-8 avec BOM**, sinon les accents sont cassés.
-- Une fonction qui renvoie un seul élément le « déroule » : entourer l'appel de `@()`.
-- Les variables sont insensibles à la casse ; ne pas nommer une variable `$args`, `$input` ou `$error`.
-- Les noms de fonctions doivent être uniques entre modules.
-- Ne nommez jamais une fonction `Invoke-Persistence…` : certains antivirus bloquent le fichier. Les tests qui écrivent des motifs de malware doivent les construire par morceaux.
+## PowerShell 5.1 pitfalls
+- `.ps1` / `.psm1` files must be **UTF-8 with BOM**, otherwise accents break.
+- A function that returns a single item "unrolls" it: wrap the call in `@()`.
+- Variables are case-insensitive; do not name a variable `$args`, `$input` or `$error`.
+- Function names must be unique across modules.
+- Never name a function `Invoke-Persistence…`: some antivirus products block the file. Tests that write malware patterns must build them in pieces.
 
 ## Tests
-Pester 3.4 : syntaxe `Should Be`, `Should Throw` (pas `Should -Be`).
+Pester 3.4: use `Should Be`, `Should Throw` (not `Should -Be`).
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Run-Tests.ps1
 ```
 
-Le code de sortie est le nombre de tests en échec (`0` = tout est bon). Ajoutez ou adaptez des tests pour chaque changement de comportement, et lancez la suite avant d'ouvrir une pull request. La CI (GitHub Actions) la relance automatiquement.
+The exit code is the number of failed tests (`0` = all good). Add or adapt tests for every behavior change, and run the suite before opening a pull request. CI (GitHub Actions) runs it again automatically.
 
-## Proposer un changement
-1. Forkez le dépôt et créez une branche à partir de `main` (`feat/...`, `fix/...`, `docs/...`).
-2. Faites des changements ciblés : une pull request = un sujet.
-3. Mettez à jour `CHANGELOG.md` ; `VERSION` est la seule source du numéro de version.
-4. Messages de commit au format `type(portée): description` (`feat`, `fix`, `docs`, `test`, `chore`).
-5. Ouvrez la pull request en décrivant ce qui change, pourquoi, et comment vous l'avez testé.
+## Proposing a change
+1. Fork the repository and create a branch from `main` (`feat/...`, `fix/...`, `docs/...`).
+2. Keep changes focused: one pull request = one topic.
+3. Update `CHANGELOG.md`; `VERSION` is the only source of the version number.
+4. Commit messages use `type(scope): description` (`feat`, `fix`, `docs`, `test`, `chore`).
+5. Open the pull request describing what changes, why, and how you tested it.
 
-Ne commitez jamais `Data\` ni `Reports\` : ce sont les données personnelles de l'utilisateur.
+Never commit `Data\` or `Reports\`: they hold the user's personal data.
 
-## Signaler une faille de sécurité
-Ne l'exposez pas dans une issue publique : contactez le mainteneur en privé via le profil GitHub du dépôt.
+## Reporting a security issue
+Do not post it in a public issue: contact the maintainer privately through the repository's GitHub profile.
 
-## Licence
-En contribuant, vous acceptez que votre code soit publié sous licence [MIT](LICENSE).
+## License
+By contributing, you agree that your code is released under the [MIT](LICENSE) license.

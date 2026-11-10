@@ -161,7 +161,7 @@ This way of working is a deliberate choice: every change goes through the test s
 
 ## Contributing
 
-Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) (in French: product rules, PowerShell 5.1 pitfalls, tests), then open an issue using the *Report a bug* or *Suggest a feature* templates.
+Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) (product rules, PowerShell 5.1 pitfalls, tests), then open an issue using the *Bug report* or *Feature request* templates.
 
 ## License
 
