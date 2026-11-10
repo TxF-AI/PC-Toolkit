@@ -29,7 +29,7 @@ Outil de diagnostic et de maintenance Windows : **Windows PowerShell 5.1 + WPF**
   - les noms de colonnes des tableaux restent les noms internes ; l'en-tête affiché vient de `Col.<nom>` ; `Update-UiLanguage` (PCToolkit.ps1) ré-applique les textes fixes de la fenêtre ;
   - les tests forcent `PCTOOLKIT_LANG=fr`.
 - Tests de l'interface réelle : piloter la vraie fenêtre avec UI Automation, en ne lançant et n'arrêtant que son propre processus (jamais « tuer tous les PCToolkit.ps1 » : l'utilisateur peut avoir l'appli ouverte).
-- `VERSION` = seule source du numéro de version. `CHANGELOG.md` à compléter à chaque version.
+- `VERSION` = seule source du numéro de version. `CHANGELOG.md` (anglais) et `CHANGELOG.fr.md` (français) à compléter à chaque version.
 - `Installer.ps1` → `%LocalAppData%\PCToolkit` + entrée HKCU « Applications installées » ; `Desinstaller.ps1` (garde-fous de dossier).
 - Interface : jauges en direct + console (relit le journal du jour) + animations dans `PCToolkit.ps1` (`Update-LiveGauges`, `Update-LogConsole`, `Set-SmoothValue`). Les tests écrivant des motifs de malware doivent les construire par morceaux (AMSI bloque les chaînes complètes).
 - `graphify-out/` : graphe du code. Après une modification de code : `graphify update .` (gratuit).

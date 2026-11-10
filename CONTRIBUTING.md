@@ -50,7 +50,7 @@ The exit code is the number of failed tests (`0` = all good). Add or adapt tests
 ## Proposing a change
 1. Fork the repository and create a branch from `main` (`feat/...`, `fix/...`, `docs/...`).
 2. Keep changes focused: one pull request = one topic.
-3. Update `CHANGELOG.md`; `VERSION` is the only source of the version number.
+3. Update `CHANGELOG.md` (and `CHANGELOG.fr.md`); `VERSION` is the only source of the version number.
 4. Commit messages use `type(scope): description` (`feat`, `fix`, `docs`, `test`, `chore`).
 5. Open the pull request describing what changes, why, and how you tested it.
 

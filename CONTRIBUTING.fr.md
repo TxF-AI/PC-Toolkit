@@ -49,7 +49,7 @@ Le code de sortie est le nombre de tests en échec (`0` = tout est bon). Ajoutez
 ## Proposer un changement
 1. Forkez le dépôt et créez une branche à partir de `main` (`feat/...`, `fix/...`, `docs/...`).
 2. Faites des changements ciblés : une pull request = un sujet.
-3. Mettez à jour `CHANGELOG.md` ; `VERSION` est la seule source du numéro de version.
+3. Mettez à jour `CHANGELOG.md` (et `CHANGELOG.fr.md`) ; `VERSION` est la seule source du numéro de version.
 4. Messages de commit au format `type(portée): description` (`feat`, `fix`, `docs`, `test`, `chore`).
 5. Ouvrez la pull request en décrivant ce qui change, pourquoi, et comment vous l'avez testé.
 

@@ -121,7 +121,7 @@ PC Toolkit\
 ├─ Desinstaller.ps1           désinstallation
 ├─ PCToolkit.ps1              application (interface)
 ├─ VERSION                    numéro de version (seule source)
-├─ CHANGELOG.md               nouveautés de chaque version
+├─ CHANGELOG.md / .fr.md        nouveautés de chaque version
 ├─ LICENSE                    licence MIT
 ├─ app.ico                    icône
 ├─ UI\MainWindow.xaml         design de l'interface

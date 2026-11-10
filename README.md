@@ -123,7 +123,7 @@ PC Toolkit\
 ├─ Desinstaller.ps1           uninstaller
 ├─ PCToolkit.ps1              application (interface)
 ├─ VERSION                    version number (single source)
-├─ CHANGELOG.md               what's new in each version (in French)
+├─ CHANGELOG.md               what's new in each version
 ├─ LICENSE                    MIT license
 ├─ app.ico                    icon
 ├─ UI\MainWindow.xaml         interface design
